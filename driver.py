@@ -33,27 +33,33 @@ if __name__ == "__main__":
     parser.add_argument('--broker', type=int,
         help='pass this followed by an integer N to create N publishers on this host')
 
-    # Required with either --pub or --sub
+    # Required with either -pub or -sub
     parser.add_argument('-t', '--topics', action='append',
         help=('if creating a pub or sub, provide list of topics to either publish or subscribe to.'
-        ' required if using --sub or --pub '))
-    parser.add_argument('-m', '--max_event_count', type=int, default=15,
+        ' required if using -sub or -pub '))
+    parser.add_argument('-m', '--max_event_count', type=int,
         help=(
             'if used with --sub, max num of published events to receive. '
-            'if used with --pub, max number of events to publish. default=15. '
+            'if used with --pub, max number of events to publish. '
             'this only matters if --indefinite is not used'))
     parser.add_argument('-i', '--indefinite', action='store_true',
         help=(
-            'if used with --pub, publish events indefinitely from created publisher(s). '
-            'if used with --sub, receive published events indefinitely with created subscriber(s)'
+            'if used with -pub, publish events indefinitely from created publisher(s). '
+            'if used with -sub, receive published events indefinitely with created subscriber(s)'
         ))
 
-    # Required with --pub
+    # Required with --publisher 
     parser.add_argument('-b', '--bind_port', type=int,
-        help='(for use with --pub) port on which to publish. If not provided with --pub, port 5556 used.')
+        help='(for use with -pub port on which to publish. If not provided with --pub, port 5556 used.')
     parser.add_argument('-s', '--sleep', type=float,
         help='Number of seconds to sleep between publish events. If not provided, 1 second used.')
 
+
+    # Required with --subscriber
+    parser.add_argument('-p', '--producers', action='append',
+        help=('required with --sub. if creating a sub, provide a list of '
+        'addresses of producers that subscriber should listen to, formatted as IP:PORT. Example: '
+        '-p 192.168.1.14:5556 -p 192.168.1.15:5557 -p 192.168.1.15:5556'))
     args = parser.parse_args()
 
     if args.broker and args.broker > 1:
@@ -70,24 +76,32 @@ if __name__ == "__main__":
 
     if (args.publisher and args.subscriber) or (args.publisher and args.broker) or \
         (args.broker and args.subscriber):
-        raise argparse.ArgumentError(
-            'Host should have 1) only publishers, 2) only subscribers, '
-            'or 3) only a broker, not a . Cannot use mix of --publisher, '
-            '--subscriber, --broker'
+        raise argparse.ArgumentTypeError(
+            'Host should have:\n'
+            '- only publishers,\n'
+            '- only subscribers, or\n'
+            '- only a broker. \n'
+            'Cannot use mix of --publisher , --subscriber , --broker on single host.'
             )
 
     if args.publisher:
         if not args.topics:
-            raise argparse.ArgumentError(
+            raise argparse.ArgumentTypeError(
                 'If creating a publisher with --publisher you must provide a set of topics to '
                 'publish with -t <topic> [-t <topic> ...]'
                 )
         create_publishers(count=args.publisher)
-    if args.subscriber:
+
+    elif args.subscriber:
         if not args.topics:
-            raise argparse.ArgumentError(
+            raise argparse.ArgumentTypeError(
                 'If creating a subscriber with --subscriber, you must provide a set of topics to '
                 'subscribe to with -t <topic> [-t <topic> ...]'
+                )
+        if not args.producers: 
+            raise argparse.ArgumentTypeError(
+                'If creating a subscriber with --subscriber, you must provide a set of producer '
+                'addresses to listen to for publish events with -p PRODUCER_IP1:PORT [-p PRODUCER_IP2:PORT...]'
                 )
         create_subscribers(count=args.subscriber)
     if args.broker:
