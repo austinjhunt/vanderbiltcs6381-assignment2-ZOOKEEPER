@@ -11,6 +11,8 @@ do
         s) sleep_seconds=${OPTARG};;
     esac
 done
+
+# Build -t TOPIC -t TOPIC ... list 
 topic_arguments=""
 for topic in "${topics[@]}"; do
   topic_arguments+="-t \"${topic}\" "
@@ -28,7 +30,7 @@ if [ -z "$count" ] ; then
 fi
 
 
-echo "Creating publishers..."
+echo "Creating $count publishers..."
 sleep 1
 
 if [ -z "$max_event_count" ] ; then
