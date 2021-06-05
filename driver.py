@@ -49,7 +49,7 @@ if __name__ == "__main__":
         ))
 
     # Required with --pub
-    parser.add_argument('-b', '--bindport', type=str,
+    parser.add_argument('-b', '--bind_port', type=int,
         help='(for use with --pub) port on which to publish. If not provided with --pub, port 5556 used.')
     parser.add_argument('-s', '--sleep', type=float,
         help='Number of seconds to sleep between publish events. If not provided, 1 second used.')
