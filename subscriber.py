@@ -16,9 +16,10 @@ class Subscriber:
         self.publishers = publishers
         self.topics = topics # topic subscriber is interested in
         self.publisher_connections = {}
-        # Create SUB type socket to talk to publishers as a subscriber
+        # Create a shared context object for all publisher connections
         self.zmq_context = zmq.Context()
-        # Use a shared zmq SUB socket to connect() to one or many publishers
+        # Use a shared zmq SUB socket with the shared context to connect()
+        # to one or many publishers
         self.socket = self.zmq_context.socket(zmq.SUB)
         # connect to all publishers stored in self.publishers
         self.connect_to_publishers()
