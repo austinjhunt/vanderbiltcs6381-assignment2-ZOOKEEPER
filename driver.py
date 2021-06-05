@@ -18,7 +18,7 @@ def create_subscribers(count=1):
         subs[i] = Subscriber()
     return subs
 
-def create_broker(count=1):
+def create_broker():
     broker = Broker()
 
 if __name__ == "__main__":
