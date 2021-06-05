@@ -11,18 +11,24 @@ class Subscriber:
     def __init__(self, publishers=[], topics=[]):
         """ Constructor
         args:
-        publishers (list) - list of IP addresses of publishers created beforehand """
+        - publishers (list) - list of IP addresses of publishers created beforehand
+        - topics (list) - list of topics this subscriber should subscribe to / 'is interested in' """
         self.publishers = publishers
         self.topics = topics # topic subscriber is interested in
         self.publisher_connections = {}
         # Create SUB type socket to talk to publishers as a subscriber
         self.zmq_context = zmq.Context()
+        # Use a shared zmq SUB socket to connect() to one or many publishers
         self.socket = self.zmq_context.socket(zmq.SUB)
+        # connect to all publishers stored in self.publishers
         self.connect_to_publishers()
 
     def add_publisher(self, address=""):
         """ Method to add a publisher to subscriber's known publishers list
-        if publisher created after initial topology setup """
+        if publisher created after initial topology setup
+        Args:
+        - address (str) - IP address as string of publisher to connect to
+        """
         logging.debug(f'Adding publisher {address} to known publishers')
         self.publishers.append(address)
         # will skip existing connections, only adds new
@@ -42,8 +48,8 @@ class Subscriber:
         """ Method to disconnect either from all publishers (clean=True)
         or from specific publishers (defined in publishers list of addresses
         Args:
-        clean (bool) : if true, disconnect from all publishers; ignore publishers list
-        publishers (list) : list of specific publisher addresses from which to disconnect
+        - clean (bool) : if true, disconnect from all publishers; ignore publishers list
+        - publishers (list) : list of specific publisher addresses from which to disconnect
         """
         if clean:
             # Close all sockets associated with this context
