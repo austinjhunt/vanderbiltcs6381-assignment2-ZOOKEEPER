@@ -3,6 +3,7 @@ import zmq
 import logging
 import time
 import datetime
+
 class Publisher:
     """ Class to represent a single publisher in a Publish/Subscribe distributed
     system. Publisher does not need to know who is consuming the information, it
