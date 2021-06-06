@@ -2,6 +2,7 @@ import socket as sock
 import zmq
 import logging
 import time
+import datetime
 class Publisher:
     """ Class to represent a single publisher in a Publish/Subscribe distributed
     system. Publisher does not need to know who is consuming the information, it
@@ -32,18 +33,44 @@ class Publisher:
         # using port specified
         self.socket.bind(f'tcp://*:{self.bind_port}')
 
+        self.logging_prefix = f'PUB{id(self)}<{",".join(self.topics)}> -'
 
-    # Maybe define a maximum number of topics per publisher
-    max_num_topics = 0
+    def current_time_to_string(self):
+        """ Method to return the current time as a string;
+        allows time to be sent as part of publish event so subscriber
+        can calculate send - receive time difference for performance testing """
+        return datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+
+    def get_address(self):
+        """ Method to return the IP address and port (IP:PORT) of the current host as a string"""
+        return f'{sock.gethostbyname(sock.gethostname())}:{self.bind_port}'
+
+    def generate_publish_event(self, iteration=0):
+        """ Method to generate a publish event
+        Args:
+        - iteration (int) - current publish event iteration for this publisher """
+        # If only N topics, then N+1 publish event will publish first topic over again
+        current_topic = self.topics[iteration % len(self.topics)]
+        current_time = self.current_time_to_string()
+        ip_address = self.get_address()
+        return  f'{current_topic} - {current_time} - {ip_address}'
 
     # Assumption:
     # Publisher is only going to publish a limited number of topics.
-    import random
     def publish(self):
         if self.indefinite:
+            i = 0
             while True:
-                event = {
-                    'testing': 'okay'
-                }
-                self.socket.send_json(event)
+                # Continuous loop over topics
+                event = self.generate_publish_event(iteration=i)
+                logging.debug(f'{self.logging_prefix} sending event: [{event}]')
+                self.socket.send_string(event)
+                time.sleep(self.sleep_period)
+                i += 1
+        else:
+            for i in range(self.max_event_count):
+                # Continuous loop over topics
+                event = self.generate_publish_event(iteration=i)
+                logging.debug(f'{self.logging_prefix} sending event: [{event}]')
+                self.socket.send_string(event)
                 time.sleep(self.sleep_period)

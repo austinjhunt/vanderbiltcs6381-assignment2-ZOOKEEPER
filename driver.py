@@ -3,19 +3,47 @@ import logging
 from publisher import Publisher
 from subscriber import Subscriber
 from broker import Broker
+from multiprocessing import Process
 
-def create_publishers(count=1):
+def create_publishers(count=1, topics=[], sleep_period=1, bind_port=5556,
+    indefinite=False, max_event_count=15):
+    """ Method to create a set of publishers. If you create more than one,
+    it will bind the first at the port specified, it will bind the next to the following port,
+    and so on. No need to specify port for every publisher if creating multiple on one host."""
     logging.info(f'Creating {count} publishers')
     pubs = {}
     for i in range(count):
-        pubs[i] = Publisher()
+        pubs[i] = Publisher(
+            topics,
+            sleep_period,
+            bind_port + i,
+            indefinite,
+            max_event_count
+        )
+        pubs[i].publish()
     return pubs
 
-def create_subscribers(count=1):
-    logging.info(f'Creating {count} subscribers')
+def create_subscribers(count=1, publishers=[], topics=[], indefinite=False, max_event_count=15):
+    """ Method to create a set of subscribers. In order to run multiple subscribers simultaneously,
+    need to use multiprocessing library, because Subscriber.listen() will block for i in range(count)
+    if run sequentially. E.g. subscriber 2 on the same host will not ever get to listen for updates
+    if subscriber 1 listens indefinitely. Multiprocessing not yet implemented, so limit count to 1 for now."""
+    logging.info(f'Creating {count} subscribers subscribed to topics <{",".join(topics)}>')
     subs = {}
+    processes = []
     for i in range(count):
-        subs[i] = Subscriber()
+        subs[i] = Subscriber(
+            publishers,
+            topics,
+            indefinite,
+            max_event_count
+        )
+        subs[i].listen()
+    #     process = Process(target=subs[i].listen)
+    #     process.start()
+    #     processes.append(process)
+    # for p in processes:
+    #     p.join()
     return subs
 
 def create_broker():
@@ -48,7 +76,7 @@ if __name__ == "__main__":
             'if used with -sub, receive published events indefinitely with created subscriber(s)'
         ))
 
-    # Required with --publisher 
+    # Required with --publisher
     parser.add_argument('-b', '--bind_port', type=int,
         help='(for use with -pub port on which to publish. If not provided with --pub, port 5556 used.')
     parser.add_argument('-s', '--sleep', type=float,
@@ -90,7 +118,14 @@ if __name__ == "__main__":
                 'If creating a publisher with --publisher you must provide a set of topics to '
                 'publish with -t <topic> [-t <topic> ...]'
                 )
-        create_publishers(count=args.publisher)
+        publishers = create_publishers(
+            count=args.publisher,
+            topics=args.topics,
+            sleep_period=args.sleep,
+            bind_port=args.bind_port if args.bind_port else 5556,
+            indefinite=args.indefinite if args.indefinite else False,
+            max_event_count=args.max_event_count if args.max_event_count else 15
+            )
 
     elif args.subscriber:
         if not args.topics:
@@ -98,12 +133,18 @@ if __name__ == "__main__":
                 'If creating a subscriber with --subscriber, you must provide a set of topics to '
                 'subscribe to with -t <topic> [-t <topic> ...]'
                 )
-        if not args.producers: 
+        if not args.producers:
             raise argparse.ArgumentTypeError(
                 'If creating a subscriber with --subscriber, you must provide a set of producer '
                 'addresses to listen to for publish events with -p PRODUCER_IP1:PORT [-p PRODUCER_IP2:PORT...]'
                 )
-        create_subscribers(count=args.subscriber)
+        subscribers = create_subscribers(
+            count=args.subscriber,
+            publishers=args.producers,
+            topics=args.topics,
+            indefinite=args.indefinite if args.indefinite else False,
+            max_event_count=args.max_event_count if args.max_event_count else 15
+            )
     if args.broker:
         create_broker()
 
