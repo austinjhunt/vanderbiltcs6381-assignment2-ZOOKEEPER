@@ -25,16 +25,27 @@ class Publisher:
         self.bind_port = bind_port
         self.indefinite = indefinite
         self.max_event_count = max_event_count
-
+        self.logging_prefix = f'PUB{id(self)}<{",".join(self.topics)}> -'
         # Create ZMQ context
         self.zmq_context = zmq.Context()
         # Create and store single zmq publisher socket type
         self.socket = self.zmq_context.socket(zmq.PUB)
         # Bind socket to network address to begin accepting client connections
-        # using port specified
-        self.socket.bind(f'tcp://*:{self.bind_port}')
+        # using port specified. If port already in use, increment port, keep trying until success.
+        self.setup_port_binding()
 
-        self.logging_prefix = f'PUB{id(self)}<{",".join(self.topics)}> -'
+    def setup_port_binding(self): 
+        success = False
+        while not success: 
+            try: 
+                logging.info(f'{self.logging_prefix} Attempting bind to port {self.bind_port}')
+                self.socket.bind(f'tcp://*:{self.bind_port}')
+                success = True
+                logging.info(f'{self.logging_prefix} Successful bind to port {self.bind_port}')
+            except:
+                logging.error(f'{self.logging_prefix} Port {self.bind_port} already in use, attempting next port')
+                success = False
+                self.bind_port += 1 
 
     def current_time_to_string(self):
         """ Method to return the current time as a string;

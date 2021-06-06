@@ -38,7 +38,7 @@ class Subscriber:
         # Apply topics of interest filter to subscriber
         self.apply_topic_filters()
         # connect to all publishers stored in self.publishers
-        logging.debug(f"Publishers: {self.publishers}")
+        logging.debug(f"{self.logging_prefix} Known publishers: {self.publishers}")
         self.connect_to_publishers()
 
     def add_publisher(self, address=""):
@@ -60,8 +60,10 @@ class Subscriber:
             if pub not in self.publisher_connections:
                 logging.debug(f'{self.logging_prefix} Connecting to publisher {pub} at tcp://{pub}')
                 # Only connect if not already connected.
-                self.publisher_connections[pub] = self.socket.connect(f'tcp://{pub}')
-
+                try: 
+                    self.publisher_connections[pub] = self.socket.connect(f'tcp://{pub}')
+                except: 
+                    logging.error(f'{self.logging_prefix} Failed to connect to publisher {pub} at tcp://{pub}')
     def disconnect_from_publishers(self, clean=False, publishers=[]):
         """ Method to disconnect either from all publishers (clean=True)
         or from specific publishers (defined in publishers list of addresses

@@ -7,19 +7,26 @@ from multiprocessing import Process
 
 def create_publishers(count=1, topics=[], sleep_period=1, bind_port=5556,
     indefinite=False, max_event_count=15):
-    """ Method to create a set of publishers. If you create more than one,
-    it will bind the first at the port specified, it will bind the next to the following port,
-    and so on. No need to specify port for every publisher if creating multiple on one host."""
-    logging.info(f'Creating {count} publishers')
+    """ Method to create a set of publishers. 
+    In order to run multiple subscribers simultaneously,
+    need to use multiprocessing library, because Publisher.publish() will block for i in range(count)
+    if run sequentially. E.g. publisher 2 on the same host will not ever get to publish updates
+    if publisher 1 publishes indefinitely. Multiprocessing not yet implemented, so limit count to 1 for now
+    
+    EVENTUALLY: If you create more than one, first publisher will be bound to first port specified, 
+    next will bind to port+1, next to port+2, etc. No need to specify port for every publisher if 
+    creating multiple on one host."""
+
+    logging.info(f'Creating {count} publishers for topics {",".join(topics)}')
     pubs = {}
-    for i in range(count):
+    for i in range(count): 
         pubs[i] = Publisher(
             topics,
             sleep_period,
             bind_port + i,
             indefinite,
             max_event_count
-        )
+        ) 
         pubs[i].publish()
     return pubs
 
