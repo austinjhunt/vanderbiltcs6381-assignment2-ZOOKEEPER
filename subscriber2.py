@@ -68,7 +68,7 @@ class Subscriber:
                 
 
 try:
-    test = Subscriber('40000', ['C', 'D'], '127.0.0.1')
+    test = Subscriber('60000', ['B'], '127.0.0.1')
     test.configure()
     test.register_sub()
     test.notify()

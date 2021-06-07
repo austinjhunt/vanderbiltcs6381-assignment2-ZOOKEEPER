@@ -61,7 +61,7 @@ class Publisher:
             time.sleep(2)
             
 try:
-    test = Publisher('127.0.0.1:5558', ['A', 'C'], '127.0.0.1')
+    test = Publisher('127.0.0.1:5559', ['B', 'C'], '127.0.0.1')
     test.configure()
     test.register_pub()
     test.publish()
