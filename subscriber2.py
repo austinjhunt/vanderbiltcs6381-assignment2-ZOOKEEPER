@@ -2,16 +2,20 @@ import zmq
 import json
 import random
 import time
+import datetime
 
 class Subscriber:
     #################################################################
     # constructor
     #################################################################
-    def __init__(self, address, topics, broker_address):
+    def __init__(self, own_address, topics, broker_address, 
+                 indefinite=False, max_event_count=15):
         # when a subscriber is initialized. it needs to specify its topics
-        self.address = address
+        self.own_address = own_address
         self.topics = topics
         self.broker_address = broker_address
+        self.indefinite = indefinite
+        self.max_event_count = max_event_count
 
         #  The zmq context
         self.context = None
@@ -22,6 +26,9 @@ class Subscriber:
         # these are the sockets we open one for each subscription
         self.broker_reg_socket = None
         self.sub_socket_dict = {}
+        
+        # a list to store all the messages received
+        self.received_message_list = []
 
     def configure(self):
         # first get the context
@@ -40,7 +47,7 @@ class Subscriber:
 
     def register_sub(self):
         print("Subscriber::event - registration started")
-        message_dict = {'address': self.address, 'topics': self.topics}
+        message_dict = {'address': self.own_address, 'topics': self.topics}
         message = json.dumps(message_dict, indent=4)
         self.broker_reg_socket.send_string(message)
         
@@ -60,15 +67,29 @@ class Subscriber:
 
     def notify(self):
         print ("Subscriber:event_loop - start to receive message")
-        while True:
-            events = dict(self.poller.poll())           
-            for topic in self.sub_socket_dict.keys():
-                if self.sub_socket_dict[topic] in events:
-                    print(self.sub_socket_dict[topic].recv_string())
-                
+        if self.indefinite:
+            while True:
+                events = dict(self.poller.poll())           
+                for topic in self.sub_socket_dict.keys():
+                    if self.sub_socket_dict[topic] in events:
+                        receive_time = time.time()
+                        full_message = self.sub_socket_dict[topic].recv_string() + ' Received at ' + f'{receive_time}'
+                        self.received_message_list.append(full_message)
+                        print(full_message)
+        else:
+            for i in range(self.max_event_count):
+                events = dict(self.poller.poll())           
+                for topic in self.sub_socket_dict.keys():
+                    if self.sub_socket_dict[topic] in events:
+                        receive_time = time.time()
+                        full_message = self.sub_socket_dict[topic].recv_string() + ' Received at ' + f'{receive_time}'
+                        self.received_message_list.append(full_message)
+                        print(full_message)            
 
 try:
-    test = Subscriber('60000', ['B'], '127.0.0.1')
+    test = Subscriber(own_address='127.0.0.1', topics=['C', 'B'], 
+                      broker_address='127.0.0.1',  indefinite=False, 
+                      max_event_count=15)
     test.configure()
     test.register_sub()
     test.notify()
