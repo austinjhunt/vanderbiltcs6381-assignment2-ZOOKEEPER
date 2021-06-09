@@ -34,10 +34,10 @@ class Publisher:
         # using port specified. If port already in use, increment port, keep trying until success.
         self.setup_port_binding()
 
-    def setup_port_binding(self): 
+    def setup_port_binding(self):
         success = False
-        while not success: 
-            try: 
+        while not success:
+            try:
                 logging.info(f'{self.logging_prefix} Attempting bind to port {self.bind_port}')
                 self.socket.bind(f'tcp://*:{self.bind_port}')
                 success = True
@@ -45,13 +45,7 @@ class Publisher:
             except:
                 logging.error(f'{self.logging_prefix} Port {self.bind_port} already in use, attempting next port')
                 success = False
-                self.bind_port += 1 
-
-    def current_time_to_string(self):
-        """ Method to return the current time as a string;
-        allows time to be sent as part of publish event so subscriber
-        can calculate send - receive time difference for performance testing """
-        return datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+                self.bind_port += 1
 
     def get_address(self):
         """ Method to return the IP address and port (IP:PORT) of the current host as a string"""
@@ -63,7 +57,7 @@ class Publisher:
         - iteration (int) - current publish event iteration for this publisher """
         # If only N topics, then N+1 publish event will publish first topic over again
         current_topic = self.topics[iteration % len(self.topics)]
-        current_time = self.current_time_to_string()
+        current_time = time.time()
         ip_address = self.get_address()
         return  f'{current_topic} - {current_time} - {ip_address}'
 
