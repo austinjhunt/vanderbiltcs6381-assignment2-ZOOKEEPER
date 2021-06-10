@@ -12,10 +12,10 @@ class Broker:
     #################################################################
     def __init__(self, address='127.0.0.1'):
         self.address = address
-        
+
         self.subscribers = {}
         self.publishers = {}
-        
+
 
         #  The zmq context
         self.context = None
@@ -26,7 +26,7 @@ class Broker:
         # these are the sockets we open one for each registration
         self.pub_reg_socket = None
         self.sub_reg_socket = None
-        
+
         # this is the centralized disimention system
         # broker will have a list of sockets for receiving from publisher
         # broker will also have a list of sockets for sending to subscrbier
@@ -80,7 +80,7 @@ class Broker:
 
             if self.sub_reg_socket in events:
                 self.register_sub()
-   
+
             for topic in self.receive_socket_dict.keys():
                 if self.receive_socket_dict[topic] in events:
                     self.send(topic)
@@ -102,9 +102,9 @@ class Broker:
         print("Broker:event_loop - Publisher Registration Succeed")
         # print("Current Pulisher Info:")
         # print(json.dumps(self.publishers, indent=4))
-        
+
     # once a publisher register with broker, the broker will start to receive message from it
-    # for a particular topic, the broker will open a SUB socket for a topic    
+    # for a particular topic, the broker will open a SUB socket for a topic
     def update_receive_socket(self):
         for topic in self.publishers.keys():
             if topic not in self.receive_socket_dict.keys():
@@ -114,15 +114,15 @@ class Broker:
                 self.receive_socket_dict[topic].connect("tcp://{0:s}".format(address))
                 self.receive_socket_dict[topic].setsockopt_string(zmq.SUBSCRIBE, topic)
         # print("Broker Receive Socket: {0:s}".format(str(list(self.receive_socket_dict.keys()))))
-        
-                
-    
+
+
+
     def send(self, topic):
         if topic in self.send_socket_dict.keys():
             received_message = self.receive_socket_dict[topic].recv_string()
             print(f"Broker Sending {received_message}")
             self.send_socket_dict[topic].send_string(received_message)
-        
+
 
     def register_sub(self):
         # the format of the registration string is a json
@@ -136,20 +136,20 @@ class Broker:
                 self.subscribers[topic] = [sub_reg_dict['address']]
             else:
                 self.subscribers[topic].append(sub_reg_dict['address'])
-                
-        # once a subscriber register with the broker, 
+
+        # once a subscriber register with the broker,
         # the broker will create socket to publish the topic
         # the broker will let the subscriper know the port
-        self.update_send_socket()        
+        self.update_send_socket()
         reply_sub_dict = {}
         for topic in sub_reg_dict['topics']:
-            reply_sub_dict[topic] = self.send_port_dict[topic]                 
+            reply_sub_dict[topic] = self.send_port_dict[topic]
         self.sub_reg_socket.send_string(json.dumps(reply_sub_dict, indent=4))
         print("Broker:event_loop - Subscriber Registration Succeed")
         # print("Current Subscriber Info:")
         # print(json.dumps(self.subscribers, indent=4))
-    
-        
+
+
     def update_send_socket(self):
         for topic in self.subscribers.keys():
             if topic not in self.send_socket_dict.keys():
@@ -163,17 +163,3 @@ class Broker:
                 print("Broker:event_loop - Topic {0:s} is being sent at port {1:d}".format(topic, port))
                 self.send_socket_dict[topic].bind("tcp://{0:s}:{1:d}".format(self.address, port))
         # print("Broker Send Socket: {0:s}".format(str(list(self.send_socket_dict.keys()))))
-                        
-                
-     
-
-try:
-    test = Broker()
-    test.configure()
-    test.event_loop()
-except KeyboardInterrupt:
-    print('> User forced exit!')    
-except Exception as e:
-    print("Oops!", e.__class__, "occurred.") 
-    traceback.print_exc()
-
