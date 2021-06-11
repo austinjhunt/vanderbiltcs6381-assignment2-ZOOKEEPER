@@ -91,7 +91,7 @@ class Broker:
         # Note that we must check for all the sockets since multiple of them
         # could have been enabled.
         # The return value of poll() is a socket to event mask mapping
-        logging.debug("Polling for events...", extra=self.prefix)
+        # logging.debug("Polling for events...", extra=self.prefix)
         events = dict(self.poller.poll())
         if self.pub_reg_socket in events:
             self.register_pub()
@@ -168,11 +168,12 @@ class Broker:
         dc = msg['disconnect']
         topics = dc['topics']
         address = dc['address']
-        notify_port = dc['notify_port']
         sub_id = dc['id']
-        self.used_ports.remove(notify_port)
-        # Close the notification socket for this subscriber with id as key
-        self.notify_sub_sockets[sub_id].close()
+        if not self.centralized:
+            notify_port = dc['notify_port']
+            self.used_ports.remove(notify_port)
+            # Close the notification socket for this subscriber with id as key
+            self.notify_sub_sockets[sub_id].close()
         for t in topics:
             if t in self.subscribers:
                 # if only subscriber to topic, remove topic altogether
@@ -236,13 +237,21 @@ class Broker:
                 self.notify_sub_sockets[sub_id].bind(f"tcp://*:{notify_port}")
                 self.notify_subscribers(topics=topics, sub_id=sub_id)
             else:
-                centralized_registration_request = self.sub_reg_socket.recv_string()
+
+                # Take a request for the topic/port mapping
+                topic_port_request = self.sub_reg_socket.recv_string()
+                logging.debug(
+                    f"Topic/Port request from subscriber: {topic_port_request}",
+                    extra=self.prefix)
+
                 ## Make sure there is a socket for each new topic.
                 self.update_send_socket()
+
                 ## Publish topic messages to subscribers.
                 reply_sub_dict = {}
                 for topic in sub_reg_dict['topics']:
                     reply_sub_dict[topic] = self.send_port_dict[topic]
+                logging.debug(f"Sending topic/ports: {reply_sub_dict}", extra=self.prefix)
                 self.sub_reg_socket.send_string(json.dumps(reply_sub_dict, indent=4))
             # response = {'success': f'registration complete - {random.randint(1,10)}'}
             logging.debug("Subscriber registered successfully", extra=self.prefix)

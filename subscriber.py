@@ -91,7 +91,6 @@ class Subscriber:
         self.notify_sub_socket.connect(f"tcp://{self.broker_address}:{self.notify_port}")
         self.poller.register(self.notify_sub_socket, zmq.POLLIN)
 
-
     def register_sub(self):
         """ Register self with broker """
         self.debug("Registering with broker")
@@ -111,6 +110,9 @@ class Subscriber:
             # Set up notification polling with that port
             self.setup_notification_polling()
         else:
+            # Request the topic/port mapping from broker
+            topic_port_request = {'request': 'topic_port_mapping'}
+            self.broker_reg_socket.send_string(json.dumps(topic_port_request))
             # Listen for broker to publish about topics
             received_message = self.broker_reg_socket.recv_string()
             self.setup_broker_topic_port_connections(received_message)
@@ -152,6 +154,7 @@ class Subscriber:
         """ Method to set up one socket per topic to listen to the broker
         where each topic is published from a different port on the broker address """
         broker_port_dict = json.loads(received_message)
+        self.debug("Broker port dict: {broker_port_dict}")
         # Broker will provide the published events so
         # create socket to receive message from broker
         for topic in self.topics:
@@ -168,7 +171,7 @@ class Subscriber:
             self.sub_socket_dict[topic].setsockopt_string(zmq.SUBSCRIBE, topic)
             self.debug(
                 f"Getting Topic {topic} from broker at "
-                f"{self.broker_address}:{broker_port}", extra=self.prefix
+                f"{self.broker_address}:{broker_port}"
                 )
 
     def parse_notification(self):
