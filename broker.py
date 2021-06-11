@@ -162,6 +162,35 @@ class Broker:
                 break
         return port
 
+    def disconnect_sub(self, msg):
+        """ Method to remove data related to a disconnecting subscriber """
+        logging.debug(f"Disconnecting subscriber...", extra=self.prefix)
+        dc = msg['disconnect']
+        topics = dc['topics']
+        address = dc['address']
+        notify_port = dc['notify_port']
+        sub_id = dc['id']
+        self.used_ports.remove(notify_port)
+        # Close the notification socket for this subscriber with id as key
+        self.notify_sub_sockets[sub_id].close()
+        for t in topics:
+            if t in self.subscribers:
+                # if only subscriber to topic, remove topic altogether
+                if len(self.subscribers[t]) == 1:
+                    self.subscribers.pop(t)
+                    if self.centralized:
+                        # Close socket then remove. No other subscribers active for t.
+                        self.send_socket_dict[t].close()
+                        self.send_socket_dict.pop(t)
+                else:
+                    # Remove just this subscriber
+                    self.subscribers[t].remove(address)
+                    # No need to update self.send_socket_dict. No outward connections with connect()
+                    # to disconnect() as with receive_socket_dict.
+
+        response = {'disconnect': 'success'}
+        return json.dumps(response)
+
     def register_sub(self):
         """ BOTH CENTRAL AND DECENTRALIZED DISSEMINATION
         Register a subscriber address as interested in a set of topics """
@@ -170,6 +199,15 @@ class Broker:
             # '{ "address":"1234", "topics":['A', 'B']}'
             logging.debug("Subscriber Registration Started", extra=self.prefix)
             sub_reg_string = self.sub_reg_socket.recv_string()
+            # Get topics and address of subscriber
+            sub_reg_dict = json.loads(sub_reg_string)
+            # Handle disconnect if requested
+            if 'disconnect' in sub_reg_dict:
+                response = self.disconnect_sub(msg=sub_reg_dict)
+                # send response
+                self.sub_reg_socket.send_string(response)
+                return
+
             if not self.centralized:
                 # Allocate a random unique port to notify this subscriber about new hosts.
                 # Port must be different for each subscriber since they are each polling
@@ -179,8 +217,6 @@ class Broker:
             else:
                 msg = {'register_sub': 'welcome, new subscriber'}
             self.sub_reg_socket.send_string(json.dumps(msg))
-            # Get topics and address of subscriber
-            sub_reg_dict = json.loads(sub_reg_string)
             topics = sub_reg_dict['topics']
             sub_address = sub_reg_dict['address']
             sub_id = sub_reg_dict['id']
@@ -233,7 +269,8 @@ class Broker:
             ]
             message = json.dumps(message)
             # Send to notify socket for each subscriber
-            for notify_socket in self.notify_sub_sockets.values():
+            for sub_id, notify_socket in self.notify_sub_sockets.items():
+                logging.debug(f"Sending notification to sub: {sub_id}", extra=self.prefix)
                 notify_socket.send_string(message)
                 logging.debug(f"Waiting for response...", extra=self.prefix)
                 confirmation = notify_socket.recv_string()
@@ -262,18 +299,46 @@ class Broker:
             confirmation = self.notify_sub_sockets[sub_id].recv_string()
             logging.debug(f"Subscriber notified successfully (confirmation: <{confirmation}>", extra=self.prefix)
 
-
+    def disconnect_pub(self, msg):
+        """ Method to remove data related to a disconnecting publisher """
+        logging.debug(f"Disconnecting publisher...", extra=self.prefix)
+        dc = msg['disconnect']
+        topics = dc['topics']
+        address = dc['address']
+        for t in topics:
+            # If this is the only publisher of a topic, remove the topic from
+            # self.publishers and from self.receive_socket_dict
+            if len(self.publishers[t]) == 1:
+                self.publishers.pop(t,None)
+                if self.centralized:
+                    # Close socket then remove. No other publishers active for t.
+                    self.receive_socket_dict[t].close()
+                    self.receive_socket_dict.pop(t)
+            else:
+                # Only remove the single publisher connection from
+                # publisher connections for this topic
+                self.publishers[t].remove(address)
+                if self.centralized:
+                    self.receive_socket_dict[t].disconnect(address)
+        response = {'disconnect': 'success'}
+        return json.dumps(response)
 
     def register_pub(self):
         """ BOTH CENTRAL AND DECENTRALIZED DISSEMINATION
-        Register a publisher as a publisher of a given topic,
+        Register (or disconnect) a publisher as a publisher of a given topic,
         e.g. 1.2.3.4 registering as publisher of topic "XYZ" """
         try:
             # the format of the registration string is a json
             # '{ "address":"1234", "topics":['A', 'B']}'
-            logging.debug("Publisher Registration Started", extra=self.prefix)
             pub_reg_string = self.pub_reg_socket.recv_string()
+            logging.debug(f"Publisher Registration Started: {pub_reg_string}", extra=self.prefix)
             pub_reg_dict = json.loads(pub_reg_string)
+            # Handle disconnect if requested
+            if 'disconnect' in pub_reg_dict:
+                response = self.disconnect_pub(msg=pub_reg_dict)
+                # send response
+                self.pub_reg_socket.send_string(response)
+                return
             pub_address = pub_reg_dict['address']
             for topic in pub_reg_dict['topics']:
                 if topic not in self.publishers.keys():
@@ -290,6 +355,7 @@ class Broker:
             response = {'success': 'registration success'}
         except Exception as e:
             response = {'error': f'registration failed due to exception: {e}'}
+        logging.debug(f"Sending response: {response}", extra=self.prefix)
         self.pub_reg_socket.send_string(json.dumps(response))
         logging.debug("Publisher Registration Succeeded", extra=self.prefix)
 

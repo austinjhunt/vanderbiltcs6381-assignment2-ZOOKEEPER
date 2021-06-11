@@ -31,8 +31,13 @@ def create_publishers(count=1, topics=[], broker_address='127.0.0.1', own_addres
             indefinite=indefinite,
             max_event_count=max_event_count
         )
-        pubs[i].configure()
-        pubs[i].publish()
+        try:
+            pubs[i].configure()
+            pubs[i].publish()
+        except KeyboardInterrupt:
+            # If you interrupt/cancel a publisher, be sure to disconnect properly
+            # to tell broker it's no longer active
+            pubs[i].disconnect()
 
     return pubs
 
@@ -54,11 +59,18 @@ def create_subscribers(count=1, filename=None, broker_address='127.0.0.1', own_a
             indefinite=indefinite,
             max_event_count=max_event_count
         )
-        subs[i].configure()
-        subs[i].notify()
-        subs[i].disconnect()
+        try:
+            subs[i].configure()
+            subs[i].notify()
+            # This will call if notify is not indefinite
+            subs[i].disconnect()
+        except KeyboardInterrupt:
+            # If you interrupt/cancel a subscriber, be sure to disconnect properly
+            # to tell broker it's no longer active
+            subs[i].disconnect()
         # If filename provided (only works with finite notify() loop), write to file
-        subs[i].write_stored_messages()
+        if filename:
+            subs[i].write_stored_messages()
     return subs
 
 def create_broker(indefinite=False, own_address='127.0.0.1', centralized=False):
@@ -68,8 +80,11 @@ def create_broker(indefinite=False, own_address='127.0.0.1', centralized=False):
         indefinite=indefinite
     )
     broker.configure()
-    broker.event_loop()
-
+    try:
+        broker.event_loop()
+    except KeyboardInterrupt:
+        # If you interrupt/cancel a broker, be sure to disconnect/clean all sockets
+        broker.disconnect()
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Pass arguments to create publishers, subscribers, or an intermediate message broker')
@@ -217,4 +232,5 @@ if __name__ == "__main__":
             centralized=args.centralized,
             indefinite=args.indefinite
         )
+
 
