@@ -26,6 +26,7 @@ class Publisher:
         - indefinite (boolean) - whether to publish events/updates indefinitely
         - max_event_count (int) - if not (indefinite), max number of events/updates to publish
         """
+        self.id = id(self)
         self.broker_address = broker_address
         self.own_address = own_address
         self.topics = topics
@@ -82,10 +83,14 @@ class Publisher:
     def register_pub(self):
         """ Method to register this publisher with the broker """
         logging.debug(f"Registering with broker at {self.broker_address}", extra=self.prefix)
-        message_dict = {'address': f'{self.own_address}:{self.bind_port}', 'topics': self.topics}
+        message_dict = {'address': f'{self.own_address}:{self.bind_port}', 'topics': self.topics,
+            'id': self.id}
         message = json.dumps(message_dict, indent=4)
+        logging.debug(f"Sending registration message: {message}", extra=self.prefix)
         self.broker_reg_socket.send_string(message)
-        received = json.loads(self.broker_reg_socket.recv_string())
+        logging.debug(f"Sent!", extra=self.prefix)
+        received = self.broker_reg_socket.recv_string()
+        received = json.loads(received)
         if 'success' in received:
             logging.debug(f"Registration successful: {received}", extra=self.prefix)
         else:
@@ -140,8 +145,16 @@ class Publisher:
     def disconnect(self):
         """ Method to disconnect from the pub/sub network """
         # Close all sockets associated with this context
-        logging.debug(f'Destroying ZMQ context, closing all sockets', extra=self.prefix)
+        # Tell broker publisher is disconnecting. Remove from storage.
+        msg = {'disconnect': {'id': self.id, 'address': f'{self.own_address}:{self.bind_port}',
+            'topics': self.topics}}
+        logging.debug(f"Disconnecting, telling broker: {msg}", extra=self.prefix)
+        self.broker_reg_socket.send_string(json.dumps(msg))
+        # Wait for response
+        response = self.broker_reg_socket.recv_string()
+        logging.debug(f"Broker response: {response} ", extra=self.prefix)
         try:
+            logging.debug(f'Destroying ZMQ context, closing all sockets', extra=self.prefix)
             self.context.destroy()
         except Exception as e:
             logging.error(f'Could not destroy ZMQ context successfully - {str(e)}', extra=self.prefix)
