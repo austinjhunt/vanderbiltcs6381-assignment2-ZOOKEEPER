@@ -221,6 +221,7 @@ class Subscriber:
         if self.filename:
             with open(self.filename, 'w') as f:
                 header = "publisher,topic,total_time_seconds"
+                f.write(f'{header}\n')
                 for message in self.received_message_list:
                     publisher = message['publisher']
                     topic = message['topic']
