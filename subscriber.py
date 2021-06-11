@@ -4,6 +4,7 @@ import logging
 import datetime
 import json
 import time
+import pickle
 
 class Subscriber:
     """ Class to represent a single subscriber in a Publish/Subscribe distributed system.
@@ -12,7 +13,7 @@ class Subscriber:
     information/updates across all publisher connections. If many publishers with relevant updates,
     updates will be interleaved and no single publisher connection will drown out the others. """
 
-    def __init__(self, broker_address="127.0.0.1", own_address="127.0.0.1", topics=[], indefinite=False,
+    def __init__(self, filename=None, broker_address="127.0.0.1", own_address="127.0.0.1", topics=[], indefinite=False,
         max_event_count=15, centralized=False):
         """ Constructor
         args:
@@ -22,6 +23,7 @@ class Subscriber:
         - indefinite (boolean) - whether to listen for published updates indefinitely
         - max_event_count (int) - if not (indefinite), max number of relevant published updates to receive
          """
+        self.filename = filename
         self.broker_address = broker_address
         self.own_address = own_address
         self.centralized = centralized
@@ -172,6 +174,20 @@ class Subscriber:
             self.setup_publisher_direct_connections(notification=notification)
             self.notify_sub_socket.send_string("Notification Acknowledged. New publishers added.")
 
+    def parse_publish_event(self, topic=""):
+        logging.debug(f"Waiting for publish event for topic {topic}", extra=self.prefix)
+        # received_message = self.sub_socket_dict[topic].recv_string()
+        [topic, received_message] = self.sub_socket_dict[topic].recv_multipart()
+        received_message = pickle.loads(received_message)
+        self.received_message_list.append(
+            {
+                'publisher': received_message['publisher'],
+                'topic': received_message['topic'],
+                'total_time_seconds': time.time() - float(received_message['publish_time'])
+            }
+        )
+        logging.debug(f'Received: <{json.dumps(received_message)}>', extra=self.prefix)
+
     def notify(self):
         """ Notify method functions independently of dissemination method,
         underlying poller and sockets are either connected only to the broker
@@ -187,10 +203,7 @@ class Subscriber:
                     # This is a normal publish event from a publisher
                     for topic in self.sub_socket_dict.keys():
                         if self.sub_socket_dict[topic] in events:
-                            receive_time = time.time()
-                            full_message = self.sub_socket_dict[topic].recv_string() + ' Received at ' + f'{receive_time}'
-                            self.received_message_list.append(full_message)
-                            logging.debug(f'Received: <{full_message}>', extra=self.prefix)
+                            self.parse_publish_event(topic=topic)
         else:
             for i in range(self.max_event_count):
                 events = dict(self.poller.poll())
@@ -200,16 +213,27 @@ class Subscriber:
                 else:
                     for topic in self.sub_socket_dict.keys():
                         if self.sub_socket_dict[topic] in events:
-                            receive_time = time.time()
-                            full_message = self.sub_socket_dict[topic].recv_string() + ' Received at ' + f'{receive_time}'
-                            self.received_message_list.append(full_message)
-                            logging.debug(f'Received: <{full_message}>', extra=self.prefix)
+                            #full_message = self.sub_socket_dict[topic].recv_string() + ' Received at ' + f'{receive_time}'
+                            self.parse_publish_event(topic=topic)
+
+    def write_stored_messages(self):
+        logging.info(f"Writing all stored messages to {self.filename}", extra=self.prefix)
+        if self.filename:
+            with open(self.filename, 'w') as f:
+                header = "publisher,topic,total_time_seconds"
+                for message in self.received_message_list:
+                    publisher = message['publisher']
+                    topic = message['topic']
+                    total_time_seconds = message['total_time_seconds']
+                    f.write(f'{publisher},{topic},{total_time_seconds}\n')
+        else:
+            logging.info("No filename was provided at construction of Subscriber")
 
 
     def disconnect(self):
         """ Method to disconnect from the pub/sub network """
         # Close all sockets associated with this context
-        logging.debug(f'Destroying ZMQ context, closing all sockets', extra=self.prefix)
+        logging.info(f'Destroying ZMQ context, closing all sockets', extra=self.prefix)
         try:
             self.context.destroy()
         except Exception as e:
@@ -241,11 +265,12 @@ class Subscriber:
     def get_time_difference_to_now(self, compare_time):
         """ Method to calculate the difference between some compare_time and now
         Args:
-        - compare_time (datetime object)
+        - compare_time (stringified float)
         Return
         datetime.timedelta
         """
-        return time.time() - compare_time
+        return time.time() - float(compare_time)
+
 
 
 

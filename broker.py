@@ -7,6 +7,7 @@ import json
 import traceback
 import random
 import logging
+import pickle
 class Broker:
     #################################################################
     # constructor
@@ -182,9 +183,12 @@ class Broker:
         that message to the appropriate set of subscribers using
         send_socket_dict[topic] """
         if topic in self.send_socket_dict.keys():
-            received_message = self.receive_socket_dict[topic].recv_string()
-            logging.debug(f"Forwarding Msg: <{received_message}>", extra=self.prefix)
-            self.send_socket_dict[topic].send_string(received_message)
+            # received_message = self.receive_socket_dict[topic].recv_string()
+            [topic,received_message] = self.receive_socket_dict[topic].recv_multipart()
+            unpickled_message = pickle.loads(received_message)
+            logging.debug(f"Forwarding Msg: <{unpickled_message}>", extra=self.prefix)
+            # self.send_socket_dict[topic].send_string(received_message)
+            self.send_socket_dict[topic.decode('utf8')].send_multipart([topic, received_message])
 
     def register_sub(self):
         """ BOTH CENTRAL AND DECENTRALIZED DISSEMINATION
