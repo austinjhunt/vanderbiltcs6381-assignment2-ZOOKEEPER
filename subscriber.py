@@ -5,6 +5,7 @@ import datetime
 import json
 import time
 import pickle
+import netifaces
 
 class Subscriber:
     """ Class to represent a single subscriber in a Publish/Subscribe distributed system.
@@ -13,7 +14,9 @@ class Subscriber:
     information/updates across all publisher connections. If many publishers with relevant updates,
     updates will be interleaved and no single publisher connection will drown out the others. """
 
-    def __init__(self, filename=None, broker_address="127.0.0.1", own_address="127.0.0.1", topics=[], indefinite=False,
+    def __init__(self, filename=None, broker_address="127.0.0.1",
+        # own_address="127.0.0.1",
+        topics=[], indefinite=False,
         max_event_count=15, centralized=False):
         """ Constructor
         args:
@@ -26,7 +29,7 @@ class Subscriber:
         self.id = id(self)
         self.filename = filename
         self.broker_address = broker_address
-        self.own_address = own_address
+        # self.own_address = own_address
         self.centralized = centralized
         self.prefix = {'prefix' : f'SUB{id(self)}<{",".join(topics)}> -'}
 
@@ -94,7 +97,7 @@ class Subscriber:
     def register_sub(self):
         """ Register self with broker """
         self.debug("Registering with broker")
-        message_dict = {'address': self.own_address, 'id': self.id, 'topics': self.topics}
+        message_dict = {'address': self.get_host_address(), 'id': self.id, 'topics': self.topics}
         message = json.dumps(message_dict, indent=4)
         self.broker_reg_socket.send_string(message)
         self.debug(f"Sent registration message: {json.dumps(message)}")
@@ -248,12 +251,25 @@ class Subscriber:
         else:
             self.info("No filename was provided at construction of Subscriber")
 
+    def get_host_address(self):
+        """ Method to return IP address of current host.
+        If using a mininet topology, use netifaces (socket.gethost... fails on mininet hosts)
+        Otherwise, local testing without mininet, use localhost 127.0.0.1 """
+        try:
+            # Will succeed on mininet. Two interfaces, get second one.
+            # Then get AF_INET address family with key = 2
+            # Then get first element in that address family (0)
+            # Then get addr property of that element.
+            address = netifaces.ifaddresses(netifaces.interfaces()[-1])[2][0]['addr']
+        except:
+            address = "127.0.0.1"
+        return address
 
     def disconnect(self):
         """ Method to disconnect from the pub/sub network """
         # Close all sockets associated with this context
         # Tell broker publisher is disconnecting. Remove from storage.
-        msg = {'disconnect': {'id': self.id, 'address': self.own_address,
+        msg = {'disconnect': {'id': self.id, 'address': self.get_host_address(),
             'topics': self.topics, 'notify_port': self.notify_port}}
         logging.debug(f"Disconnecting, telling broker: {msg}", extra=self.prefix)
         self.broker_reg_socket.send_string(json.dumps(msg))

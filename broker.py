@@ -8,11 +8,12 @@ import traceback
 import random
 import logging
 import pickle
+import netifaces
 class Broker:
     #################################################################
     # constructor
     #################################################################
-    def __init__(self, own_address='127.0.0.1', centralized=False, indefinite=False, max_event_count=15):
+    def __init__(self, centralized=False, indefinite=False, max_event_count=15):
         self.centralized = centralized
         self.prefix = {'prefix': 'BROKER - '}
         if self.centralized:
@@ -26,7 +27,6 @@ class Broker:
         # Either poll for events indefinitely or for specified max_event_count
         self.indefinite = indefinite
         self.max_event_count = max_event_count
-        self.own_address = own_address
         self.subscribers = {}
         self.publishers = {}
         #  The zmq context
@@ -366,7 +366,22 @@ class Broker:
             response = {'error': f'registration failed due to exception: {e}'}
         logging.debug(f"Sending response: {response}", extra=self.prefix)
         self.pub_reg_socket.send_string(json.dumps(response))
-        logging.debug("Publisher Registration Succeeded", extra=self.prefix)
+        # logging.debug("Publisher Registration Succeeded", extra=self.prefix)
+
+    def get_host_address(self):
+        """ Method to return IP address of current host.
+        If using a mininet topology, use netifaces (socket.gethost... fails on mininet hosts)
+        Otherwise, local testing without mininet, use localhost 127.0.0.1 """
+        try:
+            # Will succeed on mininet. Two interfaces, get second one.
+            # Then get AF_INET address family with key = 2
+            # Then get first element in that address family (0)
+            # Then get addr property of that element.
+            address = netifaces.ifaddresses(netifaces.interfaces()[-1])[2][0]['addr']
+            address = f'{address}'
+        except:
+            address = f"127.0.0.1"
+        return address
 
     def update_send_socket(self):
         """ CENTRALIZED DISSEMINATION
@@ -383,7 +398,7 @@ class Broker:
                         break
                 self.send_port_dict[topic] = port
                 logging.debug(f"Topic {topic} is being sent at port {port}", extra=self.prefix)
-                self.send_socket_dict[topic].bind(f"tcp://{self.own_address}:{port}")
+                self.send_socket_dict[topic].bind(f"tcp://{self.get_host_address()}:{port}")
 
 
 
