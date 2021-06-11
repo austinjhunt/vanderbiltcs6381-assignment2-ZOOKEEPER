@@ -35,6 +35,11 @@ class Broker:
         # these are the sockets we open one for each registration
         self.pub_reg_socket = None
         self.sub_reg_socket = None
+
+        # Socket to notify subscribers about publishers of topics
+        # Used for decentralized dissemination
+        self.notify_sub_socket = None
+
         # this is the centralized dissemination system
         # broker will have a list of sockets for receiving from publisher
         # broker will also have a list of sockets for sending to subscrbier
@@ -57,6 +62,13 @@ class Broker:
         self.pub_reg_socket.bind("tcp://*:5555")
         self.sub_reg_socket = self.context.socket(zmq.REP)
         self.sub_reg_socket.bind("tcp://*:5556")
+
+        if not self.centralized:
+            logging.debug("Enabling subscriber notification (about publishers) on port 5557",
+                extra=self.prefix)
+            self.notify_sub_socket = self.context.socket(zmq.REQ)
+            self.notify_sub_socket.bind("tcp://*:5557")
+
         # register these sockets for incoming data
         logging.debug("Register sockets with a ZMQ poller", extra=self.prefix)
         self.poller.register(self.pub_reg_socket, zmq.POLLIN)
@@ -72,6 +84,7 @@ class Broker:
         # Note that we must check for all the sockets since multiple of them
         # could have been enabled.
         # The return value of poll() is a socket to event mask mapping
+        logging.debug("Polling for events...", extra=self.prefix)
         events = dict(self.poller.poll())
         if self.pub_reg_socket in events:
             logging.debug(f"Event {index}: publisher", extra=self.prefix)
@@ -107,60 +120,45 @@ class Broker:
             for i in range(self.max_event_count):
                 self.parse_events(i+1)
 
-    def register_pub(self):
-        """ BOTH CENTRAL AND DECENTRALIZED DISSEMINATION
-        Register a publisher as a publisher of a given topic,
-        e.g. 1.2.3.4 registering as publisher of topic "XYZ" """
-        # the format of the registration string is a json
-        # '{ "address":"1234", "topics":['A', 'B']}'
-        logging.debug("Publisher Registration Started", extra=self.prefix)
-        pub_reg_string = self.pub_reg_socket.recv_string()
-        pub_reg_dict = json.loads(pub_reg_string)
-        pub_address = pub_reg_dict['address']
-        for topic in pub_reg_dict['topics']:
-            if topic not in self.publishers.keys():
-                self.publishers[topic] = [pub_address]
-            else:
-                self.publishers[topic].append(pub_address)
-
-            if not self.centralized:
-                # For de-centralized dissemination:
-                # Subscribers interested in this topic need to know to listen
-                # directly to this new publisher.
-                self.notify_subscribers(topic=topic, pub_address=pub_address)
-
-        self.pub_reg_socket.send_string("Publisher Registration Succeed")
-        logging.debug("Publisher Registration Succeeded", extra=self.prefix)
-
     def notify_subscribers(self, topic, pub_address=None):
         """ DECENTRALIZED DISSEMINATION
         Tell the subscribers of a given topic that a new publisher
-        of this topic has been added; they should start listening to it directly """
-        logging.debug(
-                    f'Notifying relevant subscribers about existing publishers '
-                    f'of topic <{topic}>', extra=self.prefix)
+        of this topic has been added; they should start listening to
+        that/those publishers directly """
+
+        addresses = None
+        if pub_address: # when registering single new publisher
+            addresses = [pub_address]
+        elif topic in self.publishers: # when registering a new subscriber
+            addresses = self.publishers[topic]
+        else: # when registering a new subscriber and no publishers of their topic
+            addresses = []
+        message = {
+            'register_pub': {
+                'addresses': addresses,
+                'topic': topic
+            }
+        }
+        message = json.dumps(message)
         if pub_address:
             # notify relevant subscribers about specific publisher for topic
             # (when registering pub)
-            message = {'register_pub': {'address': pub_address, 'topic': topic}}
-            message = json.dumps(message)
-        else:
-            # notify relevant subscribers about all publisher for topic
-            # (when registering sub)
-            if topic in self.publishers:
-                message = json.dumps({'register_pub': {'addresses': self.publishers[topic], 'topic': topic}})
-            else:
-                # No publisher has registered with this topic
-                message = json.dumps({'register_pub': {'addresses': [], 'topic': topic}})
-        logging.debug(f'Sending message: <{message}>', extra=self.prefix)
-
-        if topic in self.send_socket_dict:
             logging.debug(
-                f"Topic <{topic}> is in send_socket_dict, notifying subscriber "
-                f"about new publisher!", extra=self.prefix)
-            # Send message to socket associated with this topic.
-            # If topic not stored here, no one is subscribed to it. no need to send.
-            self.send_socket_dict[topic].send_string(message)
+                    f'Notifying relevant subscribers about newly registered publisher '
+                    f'of topic <{topic}>', extra=self.prefix)
+        else:
+            # notify relevant subscribers about all publishers for topic
+            # (when registering sub)
+            logging.debug(f"Notifying newly registered subscriber about publishers of topic {topic}!",
+                extra=self.prefix)
+
+        # Send message to socket associated with this topic.
+        # If topic not stored here, no one is subscribed to it. no need to send.
+        self.notify_sub_socket.send_string(message)
+        # Wait for a response
+        logging.debug(f"Waiting for response...", extra=self.prefix)
+        confirmation = self.notify_sub_socket.recv_string()
+        logging.debug(f"Subscriber notified successfully (confirmation: <{confirmation}>", extra=self.prefix)
 
     # once a publisher register with broker, the broker will start to receive message from it
     # for a particular topic, the broker will open a SUB socket for a topic
@@ -192,37 +190,71 @@ class Broker:
     def register_sub(self):
         """ BOTH CENTRAL AND DECENTRALIZED DISSEMINATION
         Register a subscriber address as interested in a set of topics """
+        try:
+            # the format of the registration string is a json
+            # '{ "address":"1234", "topics":['A', 'B']}'
+            logging.debug("Subscriber Registration Started", extra=self.prefix)
+            sub_reg_string = self.sub_reg_socket.recv_string()
+            sub_reg_dict = json.loads(sub_reg_string)
+            topics = sub_reg_dict['topics']
+            for topic in topics:
+                if topic not in self.subscribers.keys():
+                    self.subscribers[topic] = [sub_reg_dict['address']]
+                else:
+                    self.subscribers[topic].append(sub_reg_dict['address'])
+                if not self.centralized:
+                    ## Notify new subscriber about all publishers of topic
+                    ## so they can listen directly
+                    self.notify_subscribers(topic=topic)
+
+            if self.centralized:
+                ## Make sure there is a socket for each new topic.
+                self.update_send_socket()
+                ## Publish topic messages to subscribers.
+                reply_sub_dict = {}
+                for topic in sub_reg_dict['topics']:
+                    reply_sub_dict[topic] = self.send_port_dict[topic]
+                self.sub_reg_socket.send_string(json.dumps(reply_sub_dict, indent=4))
+                logging.debug("Subscriber Registration Succeed", extra=self.prefix)
+            response = {'success': 'registration complete'}
+        except:
+            response = {'error': 'registration failed'}
+
+        # Respond to registration request with either confirmation of failure message
+        self.sub_reg_socket.send_string(json.dumps(response))
+
+    def register_pub(self):
+        """ BOTH CENTRAL AND DECENTRALIZED DISSEMINATION
+        Register a publisher as a publisher of a given topic,
+        e.g. 1.2.3.4 registering as publisher of topic "XYZ" """
         # the format of the registration string is a json
         # '{ "address":"1234", "topics":['A', 'B']}'
-        logging.debug("Subscriber Registration Started", extra=self.prefix)
-        sub_reg_string = self.sub_reg_socket.recv_string()
-        sub_reg_dict = json.loads(sub_reg_string)
-        topics = sub_reg_dict['topics']
-        for topic in topics:
-            if topic not in self.subscribers.keys():
-                self.subscribers[topic] = [sub_reg_dict['address']]
+        logging.debug("Publisher Registration Started", extra=self.prefix)
+        pub_reg_string = self.pub_reg_socket.recv_string()
+        pub_reg_dict = json.loads(pub_reg_string)
+        pub_address = pub_reg_dict['address']
+        for topic in pub_reg_dict['topics']:
+            if topic not in self.publishers.keys():
+                self.publishers[topic] = [pub_address]
             else:
-                self.subscribers[topic].append(sub_reg_dict['address'])
-        ## Make sure there is a socket for each new topic
-        self.update_send_socket()
-        # Now use those updated sockets to notify subscribers
-        for topic in sub_reg_dict['topics']:
-            if not self.centralized:
-                # Notify new subscriber about all publishers of their topic
-                self.notify_subscribers(topic=topic)
+                self.publishers[topic].append(pub_address)
 
-        if self.centralized:
-            reply_sub_dict = {}
-            for topic in sub_reg_dict['topics']:
-                reply_sub_dict[topic] = self.send_port_dict[topic]
-            self.sub_reg_socket.send_string(json.dumps(reply_sub_dict, indent=4))
-            logging.debug("Subscriber Registration Succeed", extra=self.prefix)
+            if not self.centralized:
+                # For de-centralized dissemination:
+                # Subscribers interested in this topic need to know to listen
+                # directly to this new publisher.
+                # This starts a while loop on the subscriber.
+                self.notify_subscribers(topic=topic, pub_address=pub_address)
+
+        self.pub_reg_socket.send_string("Publisher Registration Succeed")
+        logging.debug("Publisher Registration Succeeded", extra=self.prefix)
 
     def update_send_socket(self):
         """ CENTRALIZED DISSEMINATION
         Once a subscriber registers with the broker, the broker must
         create a socket to publish the topic; the broker will let the
         subscriber know the port """
+        # Use PUB sockets (one per topic) for sending publish events
         for topic in self.subscribers.keys():
             if topic not in self.send_socket_dict.keys():
                 self.send_socket_dict[topic] = self.context.socket(zmq.PUB)
@@ -233,6 +265,8 @@ class Broker:
                 self.send_port_dict[topic] = port
                 logging.debug(f"Topic {topic} is being sent at port {port}", extra=self.prefix)
                 self.send_socket_dict[topic].bind(f"tcp://{self.own_address}:{port}")
+
+
 
 
 

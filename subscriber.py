@@ -38,11 +38,22 @@ class Subscriber:
         self.publisher_connections = {}
         # Create a shared context object for all publisher connections
         self.context = None
-        # Poller for incoming data
+        # Poller for incoming publish data
         self.poller = None
+
         # sockets dictionary -> one per subscription
+        # key = topic, value = socket for that topic
         self.sub_socket_dict = {}
+
+        # Socket for registering with broker
         self.broker_reg_socket = None
+
+        # Socket for listening to notifications about new publishers
+        # socket type = REP (broker initiates notification as "client")
+        self.notify_sub_socket = None
+
+        # a list to store all the messages received
+        self.received_message_list = []
 
 
     def configure(self):
@@ -52,12 +63,22 @@ class Subscriber:
         logging.debug ("Setting the context object", extra=self.prefix)
         self.context = zmq.Context()
         # Poller for incoming data
-        logging.debug("Setting the poller object", extra=self.prefix)
+        logging.debug("Setting the poller objects", extra=self.prefix)
         self.poller = zmq.Poller()
-                # now create socket to register with broker
+        # now create socket to register with broker
         logging.debug("Connecting to register with broker", extra=self.prefix)
+
         self.broker_reg_socket = self.context.socket(zmq.REQ)
         self.broker_reg_socket.connect(f"tcp://{self.broker_address}:5556")
+        self.poller.register(self.broker_reg_socket, zmq.POLLIN)
+
+        if not self.centralized:
+            # Socket to receive notifications about new publishers.
+            # If centralized dissemination, don't need this connection.
+            self.notify_sub_socket = self.context.socket(zmq.REP)
+            self.notify_sub_socket.connect(f"tcp://{self.broker_address}:5557")
+            self.poller.register(self.notify_sub_socket, zmq.POLLIN)
+
         # Register self with broker on init
         self.register_sub()
 
@@ -67,57 +88,47 @@ class Subscriber:
         message_dict = {'address': self.own_address, 'topics': self.topics}
         message = json.dumps(message_dict, indent=4)
         self.broker_reg_socket.send_string(message)
-        if not self.centralized:
-            # Listen for publishers directly to publish about topics
-            self.setup_publisher_direct_connections()
-        else:
+        #confirmation = json.loads(self.broker_reg_socket.recv_string())
+        #logging.debug(f"Registration confirmation: {confirmation}", extra=self.prefix)
+        #if 'success' in confirmation:
+        #    logging.debug(f"Registration succeeded: {confirmation}", extra=self.prefix)
+        #else:
+        #    logging.debug(f"Registration failed: {confirmation}", extra=self.prefix)
+
+        if self.centralized:
             # Listen for broker to publish about topics
             self.setup_broker_topic_port_connections()
+        # If not centralized, main polling in notify() will handle
+        # setting up publisher direct connections
 
-        logging.debug("Registration complete", extra=self.prefix)
-
-    def setup_publisher_direct_connections(self):
+    def setup_publisher_direct_connections(self, notification=None):
         """ Method to set up direct connections with publishers
         provided by the broker based on the topic that a subscriber has
-        just registered itself with """
+        just registered itself with
+        Args:
+        - notification (dict) new publisher notification from broker in JSON form
+        """
         # Broker may send one notification per topic upon register_sub
         # about all publisher addresses publishing that topic. Listen for those first.
         # They are over once 'register_pub' is no longer in message.
-        logging.debug("Setting up direct connections to publishers provided by broker", extra=self.prefix)
-        register_pub = True
-        while register_pub:
-            register_pub = False
-            logging.debug("Waiting for message...", extra=self.prefix)
-            received_message = json.loads(self.broker_reg_socket.recv_string())
-            logging.debug(f'Received: {received_message}', extra=self.prefix)
-            if 'register_pub' in received_message:
-                register_pub = True
-                # value is a list of publisher addresses to listen to
-                publisher_addresses = received_message['register_pub']['addresses']
-                # The topic these publishers publish
-                topic = received_message['register_pub']['topic']
-                self.add_publisher_direct_connections_helper(
-                    publisher_addresses=publisher_addresses,
-                    topic=topic
-                )
+        # value is a list of publisher addresses to listen to or a single address
+        publisher_addresses = notification['register_pub']['addresses']
+        # The topic these publishers publish
+        topic = notification['register_pub']['topic']
 
-    def add_publisher_direct_connections_helper(self, publisher_addresses=[], topic=""):
-        """ DECENTRALIZED DISSEMINATION
-        Helper method to add direct connections to publisher addresses
-        that have been provided by the broker (for a specific topic)
-        Args:
-        - publisher_addresses (list) - list of publisher IP addresses to which to connect directly
-        - topic (str) - the topic published by these publishers to use as the key for the new socket
-        """
-        # One SUB socket per topic
-        self.sub_socket_dict[topic] = self.context.socket(zmq.SUB)
-        self.poller.register(self.sub_socket_dict[topic], zmq.POLLIN)
-        for p in publisher_addresses:
-            logging.debug(f'Adding publisher {p} to known publishers', extra=self.prefix)
-            self.publishers.append(p)
-            self.sub_socket_dict[topic].connect(f"tcp://{p}:5556")
-            # Set filter <topic> on the socket
-            self.sub_socket_dict[topic].setsockopt_string(zmq.SUBSCRIBE, topic)
+        if topic in self.topics:
+            # Set up one SUB socket for topic if not already created
+            if topic not in self.sub_socket_dict:
+                self.sub_socket_dict[topic] = self.context.socket(zmq.SUB)
+                self.poller.register(self.sub_socket_dict[topic], zmq.POLLIN)
+            # Connect to publisher addresses if topic is of interest
+            for p in publisher_addresses:
+                logging.debug(f'Adding publisher {p} to known publishers', extra=self.prefix)
+                # p includes port!
+                self.sub_socket_dict[topic].connect(f"tcp://{p}")
+                # Set filter <topic> on the socket
+                self.sub_socket_dict[topic].setsockopt_string(zmq.SUBSCRIBE, topic)
+
 
     def setup_broker_topic_port_connections(self):
         """ Method to set up one socket per topic to listen to the broker
@@ -143,30 +154,59 @@ class Subscriber:
                 f"{self.broker_address}:{broker_port}", extra=self.prefix
                 )
 
+    def parse_notification(self):
+        """ DECENTRALIZED DISSEMINATION
+        Method to parse notification about new publishers from broker
+        IF there are new publishers, setup direct connections. """
+        # First determine if there are new publisher connections to setup
+        # New publisher(s) to add for direct connection
+        notification = self.notify_sub_socket.recv_string()
+        if 'register_pub' in notification:
+            logging.debug(f"New register_pub notification...", extra=self.prefix)
+            notification = json.loads(notification)
+            self.setup_publisher_direct_connections(notification=notification)
+            self.notify_sub_socket.send_string("Notification Acknowledged. New publishers added.")
+
     def notify(self):
         """ Notify method functions independently of dissemination method,
         underlying poller and sockets are either connected only to the broker
-        (centralized) or are connected directly to the source publishers, but
-        information is pulled in the same way for both methods """
+        (centralized) or are connected directly to the source publishers """
         logging.debug("Start to receive message", extra=self.prefix)
         if self.indefinite:
             while True:
                 events = dict(self.poller.poll())
-                for topic in self.sub_socket_dict.keys():
-                    if self.sub_socket_dict[topic] in events:
-                        receive_time = time.time()
-                        full_message = self.sub_socket_dict[topic].recv_string() + ' Received at ' + f'{receive_time}'
-                        self.received_message_list.append(full_message)
-                        logging.debug(f'Received: <{full_message}>', extra=self.prefix)
+                if self.notify_sub_socket in events:
+                    # This is a notification about new publishers
+                    self.parse_notification()
+                elif self.broker_reg_socket in events:
+                    response = self.broker_reg_socket.recv_string()
+                    if 'success' in response:
+                        logging.debug("Registration successful", extra=self.prefix)
+                else:
+                    # This is a normal publish event from a publisher
+                    for topic in self.sub_socket_dict.keys():
+                        if self.sub_socket_dict[topic] in events:
+                            receive_time = time.time()
+                            full_message = self.sub_socket_dict[topic].recv_string() + ' Received at ' + f'{receive_time}'
+                            self.received_message_list.append(full_message)
+                            logging.debug(f'Received: <{full_message}>', extra=self.prefix)
         else:
             for i in range(self.max_event_count):
                 events = dict(self.poller.poll())
-                for topic in self.sub_socket_dict.keys():
-                    if self.sub_socket_dict[topic] in events:
-                        receive_time = time.time()
-                        full_message = self.sub_socket_dict[topic].recv_string() + ' Received at ' + f'{receive_time}'
-                        self.received_message_list.append(full_message)
-                        logging.debug(f'Received: <{full_message}>', extra=self.prefix)
+                if self.notify_sub_socket in events:
+                    # This is a notification about new publishers
+                    self.parse_notification()
+                elif self.broker_reg_socket in events:
+                    response = self.broker_reg_socket.recv_string()
+                    if 'success' in response:
+                        logging.debug("Registration successful", extra=self.prefix)
+                else:
+                    for topic in self.sub_socket_dict.keys():
+                        if self.sub_socket_dict[topic] in events:
+                            receive_time = time.time()
+                            full_message = self.sub_socket_dict[topic].recv_string() + ' Received at ' + f'{receive_time}'
+                            self.received_message_list.append(full_message)
+                            logging.debug(f'Received: <{full_message}>', extra=self.prefix)
 
 
     def disconnect(self):
