@@ -84,7 +84,6 @@ class Broker:
         # Note that we must check for all the sockets since multiple of them
         # could have been enabled.
         # The return value of poll() is a socket to event mask mapping
-        logging.debug("Polling for events...", extra=self.prefix)
         events = dict(self.poller.poll())
         if self.pub_reg_socket in events:
             logging.debug(f"Event {index}: publisher", extra=self.prefix)
@@ -215,11 +214,11 @@ class Broker:
                 for topic in sub_reg_dict['topics']:
                     reply_sub_dict[topic] = self.send_port_dict[topic]
                 self.sub_reg_socket.send_string(json.dumps(reply_sub_dict, indent=4))
-                logging.debug("Subscriber Registration Succeed", extra=self.prefix)
+                confirmation = self.sub_reg_socket.recv_string()
+                logging.debug(f"Subscriber acknowledged topic ports: {confirmation}", extra=self.prefix)
             response = {'success': 'registration complete'}
-        except:
-            response = {'error': 'registration failed'}
-
+        except Exception as e:
+            response = {'error': f'registration failed due to exception: {e}'}
         # Respond to registration request with either confirmation of failure message
         self.sub_reg_socket.send_string(json.dumps(response))
 
@@ -227,26 +226,29 @@ class Broker:
         """ BOTH CENTRAL AND DECENTRALIZED DISSEMINATION
         Register a publisher as a publisher of a given topic,
         e.g. 1.2.3.4 registering as publisher of topic "XYZ" """
-        # the format of the registration string is a json
-        # '{ "address":"1234", "topics":['A', 'B']}'
-        logging.debug("Publisher Registration Started", extra=self.prefix)
-        pub_reg_string = self.pub_reg_socket.recv_string()
-        pub_reg_dict = json.loads(pub_reg_string)
-        pub_address = pub_reg_dict['address']
-        for topic in pub_reg_dict['topics']:
-            if topic not in self.publishers.keys():
-                self.publishers[topic] = [pub_address]
-            else:
-                self.publishers[topic].append(pub_address)
+        try:
+            # the format of the registration string is a json
+            # '{ "address":"1234", "topics":['A', 'B']}'
+            logging.debug("Publisher Registration Started", extra=self.prefix)
+            pub_reg_string = self.pub_reg_socket.recv_string()
+            pub_reg_dict = json.loads(pub_reg_string)
+            pub_address = pub_reg_dict['address']
+            for topic in pub_reg_dict['topics']:
+                if topic not in self.publishers.keys():
+                    self.publishers[topic] = [pub_address]
+                else:
+                    self.publishers[topic].append(pub_address)
 
-            if not self.centralized:
-                # For de-centralized dissemination:
-                # Subscribers interested in this topic need to know to listen
-                # directly to this new publisher.
-                # This starts a while loop on the subscriber.
-                self.notify_subscribers(topic=topic, pub_address=pub_address)
-
-        self.pub_reg_socket.send_string("Publisher Registration Succeed")
+                if not self.centralized:
+                    # For de-centralized dissemination:
+                    # Subscribers interested in this topic need to know to listen
+                    # directly to this new publisher.
+                    # This starts a while loop on the subscriber.
+                    self.notify_subscribers(topic=topic, pub_address=pub_address)
+            response = {'success': 'registration success'}
+        except Exception as e:
+            response = {'error': f'registration failed due to exception: {e}'}
+        self.pub_reg_socket.send_string(json.dumps(response))
         logging.debug("Publisher Registration Succeeded", extra=self.prefix)
 
     def update_send_socket(self):

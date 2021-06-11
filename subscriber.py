@@ -88,16 +88,21 @@ class Subscriber:
         message_dict = {'address': self.own_address, 'topics': self.topics}
         message = json.dumps(message_dict, indent=4)
         self.broker_reg_socket.send_string(message)
-        #confirmation = json.loads(self.broker_reg_socket.recv_string())
-        #logging.debug(f"Registration confirmation: {confirmation}", extra=self.prefix)
-        #if 'success' in confirmation:
-        #    logging.debug(f"Registration succeeded: {confirmation}", extra=self.prefix)
-        #else:
-        #    logging.debug(f"Registration failed: {confirmation}", extra=self.prefix)
-
+        logging.debug(f"Message sent: {message}", extra=self.prefix)
         if self.centralized:
             # Listen for broker to publish about topics
             self.setup_broker_topic_port_connections()
+            logging.debug(f"Successfully set up broker topic/port connections", extra=self.prefix)
+        topics_ports_acknowledgement = {'ack': 'topics and their ports acknowledged'}
+        self.broker_reg_socket.send_string(json.dumps(topics_ports_acknowledgement))
+        logging.debug(f"Acknowledged topics/ports: {topics_ports_acknowledgement}",extra=self.prefix)
+        confirmation = json.loads(self.broker_reg_socket.recv_string())
+        logging.debug(f"Registration confirmation: {confirmation}", extra=self.prefix)
+        if 'success' in confirmation:
+            logging.debug(f"Registration succeeded: {confirmation}", extra=self.prefix)
+        else:
+            logging.debug(f"Registration failed: {confirmation}", extra=self.prefix)
+
         # If not centralized, main polling in notify() will handle
         # setting up publisher direct connections
 
@@ -178,10 +183,6 @@ class Subscriber:
                 if self.notify_sub_socket in events:
                     # This is a notification about new publishers
                     self.parse_notification()
-                elif self.broker_reg_socket in events:
-                    response = self.broker_reg_socket.recv_string()
-                    if 'success' in response:
-                        logging.debug("Registration successful", extra=self.prefix)
                 else:
                     # This is a normal publish event from a publisher
                     for topic in self.sub_socket_dict.keys():
@@ -196,10 +197,6 @@ class Subscriber:
                 if self.notify_sub_socket in events:
                     # This is a notification about new publishers
                     self.parse_notification()
-                elif self.broker_reg_socket in events:
-                    response = self.broker_reg_socket.recv_string()
-                    if 'success' in response:
-                        logging.debug("Registration successful", extra=self.prefix)
                 else:
                     for topic in self.sub_socket_dict.keys():
                         if self.sub_socket_dict[topic] in events:

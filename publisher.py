@@ -50,6 +50,7 @@ class Publisher:
         self.broker_reg_socket = self.context.socket(zmq.REQ)
         self.broker_reg_socket.connect("tcp://{0:s}:5555".format(self.broker_address))
 
+
         # now create socket to publish
         self.pub_socket = self.context.socket(zmq.PUB)
         self.setup_port_binding()
@@ -83,7 +84,11 @@ class Publisher:
         message_dict = {'address': f'{self.own_address}:{self.bind_port}', 'topics': self.topics}
         message = json.dumps(message_dict, indent=4)
         self.broker_reg_socket.send_string(message)
-        logging.debug(f'Received message: {self.broker_reg_socket.recv_string()}', extra=self.prefix)
+        received = json.loads(self.broker_reg_socket.recv_string())
+        if 'success' in received:
+            logging.debug(f"Registration successful: {received}", extra=self.prefix)
+        else:
+            logging.debug(f"Registration failed: {received}", extra=self.prefix)
 
     def get_address(self):
         """ Method to return the IP address and port (IP:PORT) of the current host as a string"""
