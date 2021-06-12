@@ -11,7 +11,7 @@ from topologies.single_switch_topology import SingleSwitchTopo
 class CentralizedTest(unittest.TestCase):
     # All centralized tests
     def test_single_switch_topology(self, subscribers=1, publishers=1):
-        "Create and test a simple network"
+        "Create and test Pub/Sub on a Single Switch Topology mininet network"
         num_hosts = subscribers + publishers + 1 # (broker)
         if num_hosts < 3:
             # Raise exception. You need at least one broker, one subscriber and one publisher.
@@ -19,9 +19,9 @@ class CentralizedTest(unittest.TestCase):
         topo = SingleSwitchTopo(n=num_hosts)
         net = Mininet(topo, controller = OVSController)
         net.start()
-        logging.info( "Dumping host connections" )
-        dumpNodeConnections(net.hosts)
-        logging.info( "Testing network connectivity" )
+        # logging.info( "Dumping host connections" )
+        # dumpNodeConnections(net.hosts)
+        # logging.info( "Testing network connectivity" )
         # net.pingAll()
         # net.stop()
 

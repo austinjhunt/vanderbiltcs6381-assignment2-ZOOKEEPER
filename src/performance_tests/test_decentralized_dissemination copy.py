@@ -6,11 +6,7 @@ from mininet.node import OVSController
 
 class CentralizedTest(unittest.TestCase):
     # All centralized tests
-    publisher_command
-
-    # FIXME: randomize topics
-    PUBLISHER_COMMAND = 'python driver.py -pub 1 -t A -m 30 -b'
-    SUBSCRIBER_COMMAND = 'python driver.py -sub 1 -t A -t B -t C -m 30 -b 127.0.0.1 -v'
+    publisher_command 
 
     def test_single_switch_topology(self, subscribers=1, publishers=1):
         "Create and test a simple network"

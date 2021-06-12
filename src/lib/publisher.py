@@ -6,6 +6,7 @@ import datetime
 import json
 import pickle
 import netifaces
+
 class Publisher:
     """ Class to represent a single publisher in a Publish/Subscribe distributed
     system. Publisher does not need to know who is consuming the information, it
@@ -52,8 +53,6 @@ class Publisher:
         logging.debug("Connecting to register with broker", extra=self.prefix)
         self.broker_reg_socket = self.context.socket(zmq.REQ)
         self.broker_reg_socket.connect("tcp://{0:s}:5555".format(self.broker_address))
-
-
         # now create socket to publish
         self.pub_socket = self.context.socket(zmq.PUB)
         self.setup_port_binding()
