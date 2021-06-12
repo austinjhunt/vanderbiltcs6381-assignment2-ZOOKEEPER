@@ -1,8 +1,8 @@
 import argparse
 import logging
-from publisher import Publisher
-from subscriber import Subscriber
-from broker import Broker
+from lib.publisher import Publisher
+from lib.subscriber import Subscriber
+from lib.broker import Broker
 from multiprocessing import Process
 
 driver_logging_prefix = {'prefix': 'DRIVER'}
@@ -84,6 +84,7 @@ def create_broker(indefinite=False, centralized=False):
     except KeyboardInterrupt:
         # If you interrupt/cancel a broker, be sure to disconnect/clean all sockets
         broker.disconnect()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Pass arguments to create publishers, subscribers, or an intermediate message broker')

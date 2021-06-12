@@ -9,6 +9,8 @@ import random
 import logging
 import pickle
 import netifaces
+import sys
+
 class Broker:
     #################################################################
     # constructor
@@ -52,6 +54,7 @@ class Broker:
         self.send_socket_dict = {}
         self.send_port_dict = {}
         self.used_ports = []
+
     def configure(self):
         """ Method to perform initial configuration of Broker entity """
         #  The zmq context
@@ -92,7 +95,14 @@ class Broker:
         # could have been enabled.
         # The return value of poll() is a socket to event mask mapping
         # logging.debug("Polling for events...", extra=self.prefix)
-        events = dict(self.poller.poll())
+        try:
+            events = dict(self.poller.poll())
+        except zmq.error.ZMQError as e:
+            if 'Socket operation on non-socket' in str(e):
+                logging.error(f'Exception with self.poller.poll(): {e}', extra=self.prefix)
+                self.disconnect()
+                sys.exit(1)
+
         if self.pub_reg_socket in events:
             self.register_pub()
             if self.centralized:
@@ -156,6 +166,7 @@ class Broker:
             self.send_socket_dict[topic.decode('utf8')].send_multipart([topic, received_message])
 
     def get_clear_port(self):
+        """ Method to get a clear port that has not been allocated """
         while True:
             port = random.randint(10000, 20000)
             if port not in self.used_ports:
@@ -400,7 +411,12 @@ class Broker:
                 logging.debug(f"Topic {topic} is being sent at port {port}", extra=self.prefix)
                 self.send_socket_dict[topic].bind(f"tcp://{self.get_host_address()}:{port}")
 
-
+    def disconnect(self):
+        try:
+            logging.info("Disconnecting. Destroying ZMQ context..", extra=self.prefix)
+            self.context.destroy()
+        except Exception as e:
+            logging.error(f"Failed to destroy context: {e}", extra=self.prefix)
 
 
 

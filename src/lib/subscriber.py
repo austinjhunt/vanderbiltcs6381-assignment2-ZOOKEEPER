@@ -282,7 +282,6 @@ class Subscriber:
         except Exception as e:
             logging.error(f'Could not destroy ZMQ context successfully - {str(e)}', extra=self.prefix)
 
-
     def subscribe_to_new_topics(self, topics=[]):
         """ Method to add additional subscriptions/topics of interest for this subscriber
         Args:
@@ -290,30 +289,6 @@ class Subscriber:
         for t in topics:
             if t not in self.topics:
                 self.topics.append(t)
-
-    def get_publish_time_from_event(self, event):
-        """ Method to pull a datetime object from an event received from a publisher
-        where the datetime object represents the time the event was published.
-        Args:
-        event (str) - event received from publisher
-        Return:
-        datetime object (time of publish)
-        """
-        items = [el.strip() for el in event.split('-')]
-        # second item is time of publish
-        publish_time_string = items[1]
-        # Parse using same format used by publisher to generate the string
-        return float(publish_time_string)
-
-    def get_time_difference_to_now(self, compare_time):
-        """ Method to calculate the difference between some compare_time and now
-        Args:
-        - compare_time (stringified float)
-        Return
-        datetime.timedelta
-        """
-        return time.time() - float(compare_time)
-
 
     def info(self, msg):
         logging.info(msg, extra=self.prefix)
