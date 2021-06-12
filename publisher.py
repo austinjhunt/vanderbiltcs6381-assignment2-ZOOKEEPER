@@ -146,7 +146,7 @@ class Publisher:
                 # Continuous loop over topics
                 event = self.generate_publish_event(iteration=i)
                 logging.debug(f'Sending event: [{event}]', extra=self.prefix)
-                self.pub_socket.send_string(event)
+                self.pub_socket.send_multipart(event)
                 time.sleep(self.sleep_period)
 
     def disconnect(self):
