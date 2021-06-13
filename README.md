@@ -253,6 +253,34 @@ The Broker class holds a number of responsibilities, which vary depending on the
   * Forwarding those received events to subscribers who are registered as interested in the event topics, if any. If none, then drop events.
   * Upon publisher registration (with new topics being published), setting up a local (on the Broker) publishing/forwarding mechanism for each of that publisher's topics and subsequently notifying that topic's subscribers (if any) about it so they can listen to the Broker for forwarded messages with that topic
 
+To align with these responsibilities, the Broker class is also configurable along a couple of key variables: 
+
+#### Centralized or Not
+First and foremost, the broker must know whether the Pub/Sub system uses a centralized (centralized=True) or decentralized (centralized=False) dissemination model. This argument significantly governs the path of internal logic when processing received messages from the publisher(s), as can be seen in the above outline.
+
+#### How Long to Listen/Send
+The Broker, similar to the Subscriber and Publisher, can be configured to process events (where "process" could mean different things depending on the dissemination model) either indefinitely or, if not indefinitely, until a specific event count is reached. Note that with the centralized dissemination model, if the Broker is configured to process N events, then any registered Subscriber will receive at most N events even if configured to listen indefinitely. 
+
+### The Driver [(src/driver.py)](src/driver.py)
+The driver script was created to facilitate a modular implementation of performance testing by "driving" the creation, configuration, connection, execution, and disconnection of the different pub/sub entities based on arguments passed into it. Rather than creating one single script to perform a complete test, the reusable driver script allows you to spin up (and down) and configure Pub/Sub entities on a host (or different hosts) by simply passing some key arguments to the driver. Below is an outline of the arguments accepted by the driver. 
+* `-v | --verbose` : verbose logging; pass this to enable debugging 
+* `-pub | --publisher [COUNT]` : create COUNT publishers on this host (NOTE: current limit on COUNT is 1 as we have not implemented multiprocessing on the driver)
+* `-sub | --subscriber [COUNT]` : create COUNT subscribers on this host (NOTE: current limit on COUNT is 1 as we have not implemented multiprocessing on the driver)
+* `--broker [COUNT]` : create COUNT brokers on this host; NOTE: limit is 1, as the architecture does not support a multi-broker Pub/Sub system
+* `-f | --filename <FILE NAME/FULL PATH>` : Only for use with --subscriber if **NOT** `--indefinite`
+* `-c | --centralized` : Whether to use centralized dissemination model; required with `--subscriber` and `--broker ` but not with `--publisher` because publisher is purely indifferent to dissemination method. To a publisher, everyone is a subscriber.
+* Required with `--publisher` and `--subscriber`
+    * `-t | --topic <TOPIC>` : if creating a publisher or subscriber, provide a topic to either publish or subscribe to. If you want multiple for either, use `-t T1 -t T2 [-t T3...]`
+    * `-b | --broker_address` : must provide the IP address of the broker (regardless of dissemination method)
+* `-i | --indefinite` : If passed with `--publisher`, publish events indefinitely; If passed with `--subscriber`, listen for published events indefinitely; If passed with `--broker`, process events indefinitely 
+* `-m | --max_event_count` : Only applies if `--indefinite` **NOT** passed; maximum number of events to process (publish/listen for/forward).
+* Required with `--publisher`:
+    * `-bp | --bind_port` : port from which to publish events. When passing around the publisher address in messages for identifying publishers, the bind port is included in the address (IP:bind_port) in case multiple publishers are running on the same host. 
+    * `-s | --sleep` : Number of seconds to sleep between publish events 
+
+A couple of key things to note with the driver: 
+* You cannot pass a mix of `--subscriber`, `--publisher`, and `--broker`; you can only create one type of entity per driver.py call
+* You cannot currently pass a COUNT greater than 1 to `--subscriber COUNT`, `--publisher COUNT`, or `--broker COUNT` because multiprocessing on the driver side has not been implemented. With the current structure of the driver, for example, if you want to create 3 Subscribers (`--subscriber 3`) with one call, the driver would enter a 3-iteration loop, where each iteration 1) creates a subscriber, 2) configures the subscriber, and 3) starts the either *indefinite* or *N max events* `notify()` loop for the subscriber. This `notify()` method of the subscriber is blocking, which prevents the 2nd and 3rd subscribers from being created until the first disconnects. Multiprocessing would allow the notify() call to be non-blocking and thus would allow the creation/execution of multiple subscribers per driver.py call. This same problem exists with the Publisher's `publish()` method. For the Broker, the limit is 1 because the general project architecture does not currently support a multiple-broker Publish/Subscribe system.
 
 ## Unit Testing
 

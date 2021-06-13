@@ -25,7 +25,6 @@ def create_publishers(count=1, topics=[], broker_address='127.0.0.1',
         pubs[i] = Publisher(
             topics=topics,
             broker_address=broker_address,
-            # own_address=own_address,
             sleep_period=sleep_period,
             bind_port=bind_port + i,
             indefinite=indefinite,
@@ -54,7 +53,6 @@ def create_subscribers(count=1, filename=None, broker_address='127.0.0.1',
             topics=topics,
             filename=filename,
             broker_address=broker_address,
-            # own_address=own_address,
             centralized=centralized,
             indefinite=indefinite,
             max_event_count=max_event_count
@@ -113,10 +111,11 @@ if __name__ == "__main__":
         'whether to use centralized message dissemination (broker anonymizes pub and sub); '
         'if not passed, will use direct message dissemination (subscriber connects directly to publisher)'
     ))
-    # Required with either -pub or -sub
+    # Required with --publisher and --subscriber
     parser.add_argument('-t', '--topics', action='append',
         help=('if creating a pub or sub, provide list of topics to either publish or subscribe to.'
         ' required if using -sub or -pub '))
+    
     parser.add_argument('-m', '--max_event_count', type=int,
         help=(
             'if used with --sub, max num of published events to receive. '
@@ -127,9 +126,10 @@ if __name__ == "__main__":
             'if used with -pub, publish events indefinitely from created publisher(s). '
             'if used with -sub, receive published events indefinitely with created subscriber(s)'
         ))
+    
+    # Required with --publisher and --subscriber
     parser.add_argument('-b', '--broker_address', type=str, help=(
-        'required with --publisher/--subscriber; provide the IP address of the broker; '
-        'it will run on port 5556'
+        'required with --publisher/--subscriber; provide the IP address of the broker'
     ) )
 
     # Required with --publisher
@@ -170,10 +170,10 @@ if __name__ == "__main__":
                 'If creating a publisher with --publisher you must provide a set of topics to '
                 'publish with -t <topic> [-t <topic> ...]'
                 )
-        # if not args.broker_address:
-        #     raise argparse.ArgumentTypeError(
-        #         'You need to provide a broker IP address with --broker_address [-b] <IP ADDRESS>'
-        #         )
+        if not args.broker_address:
+            raise argparse.ArgumentTypeError(
+                'You need to provide a broker IP address with --broker_address [-b] <IP ADDRESS>'
+                )
         if args.filename:
             raise argparse.ArgumentTypeError(
                 '--filename not a valid argument with --publisher type. only works with --subscriber'
@@ -181,7 +181,6 @@ if __name__ == "__main__":
         publishers = create_publishers(
             count=args.publisher,
             broker_address=args.broker_address,
-            # own_address=args.address, # ideally remove
             topics=args.topics,
             sleep_period=args.sleep if args.sleep else 1,
             bind_port=args.bind_port if args.bind_port else 5556,
@@ -199,10 +198,6 @@ if __name__ == "__main__":
             raise argparse.ArgumentTypeError(
                 'You need to provide a broker IP address with --broker_address [-b] <IP ADDRESS>'
                 )
-        # if not args.address:
-        #     raise argparse.ArgumentTypeError(
-        #         'You need to provide the IP address of this host with --address [-a] <IP ADDRESS>'
-        #         )
         if args.indefinite and args.filename:
             raise argparse.ArgumentTypeError(
                 'Cannot write to file (--filename) if using indefinite loop; file write only '
@@ -212,23 +207,17 @@ if __name__ == "__main__":
             count=args.subscriber,
             filename=args.filename if args.filename else None,
             broker_address=args.broker_address,
-            # own_address=args.address, # ideally remove
             centralized=args.centralized,
             topics=args.topics,
             indefinite=args.indefinite if args.indefinite else False,
             max_event_count=args.max_event_count if args.max_event_count else 15
             )
     if args.broker:
-        # if not args.address:
-        #     raise argparse.ArgumentTypeError(
-        #         'You need to provide the IP address of this host with --address [-a] <IP ADDRESS>'
-        #     )
         if args.filename:
             raise argparse.ArgumentTypeError(
                 '--filename not a valid argument with --publisher type. only works with --subscriber'
                 )
         create_broker(
-            # own_address=args.address,
             centralized=args.centralized,
             indefinite=args.indefinite
         )
