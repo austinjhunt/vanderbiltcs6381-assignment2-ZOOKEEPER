@@ -12,7 +12,7 @@ logging.basicConfig(
     format='%(prefix)s - %(message)s')
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-class CentralizedDisseminationPubSubPerformanceTest:
+class CentralizedPerformanceTest:
 
     def __init__(self, num_events=50, event_interval=0.3, wait_factor=10):
         self.num_events = num_events
@@ -176,7 +176,7 @@ class CentralizedDisseminationPubSubPerformanceTest:
 
 if __name__ == "__main__":
 
-    centralized_perf_test = CentralizedDisseminationPubSubPerformanceTest(
+    centralized_perf_test = CentralizedPerformanceTest(
         num_events=100,
         event_interval=0.1,
         wait_factor=5
