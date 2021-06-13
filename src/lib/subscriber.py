@@ -15,7 +15,6 @@ class Subscriber:
     updates will be interleaved and no single publisher connection will drown out the others. """
 
     def __init__(self, filename=None, broker_address="127.0.0.1",
-        # own_address="127.0.0.1",
         topics=[], indefinite=False,
         max_event_count=15, centralized=False):
         """ Constructor
@@ -101,23 +100,19 @@ class Subscriber:
         message = json.dumps(message_dict, indent=4)
         self.broker_reg_socket.send_string(message)
         self.debug(f"Sent registration message: {json.dumps(message)}")
-        reg_started = self.broker_reg_socket.recv_string()
-        reg_started = json.loads(reg_started)
-        # Begin listening to this port on broker for notifications.
-        self.debug(f"Registration start message from broker: {reg_started}")
+        received_message = self.broker_reg_socket.recv_string()
+        received_message = json.loads(received_message)
+        self.debug(f"Registration start msg from broker: {received_message}")
         # Structure: {'register_sub': {'notify_port': notify_port}}
         if not self.centralized:
             # Get the port that was allocated for notifications to this subscriber
             # about new publishers
-            self.notify_port = reg_started['register_sub']['notify_port']
+            # Begin listening to this port on broker for notifications.
+            self.notify_port = received_message['register_sub']['notify_port']
             # Set up notification polling with that port
             self.setup_notification_polling()
         else:
-            # Request the topic/port mapping from broker
-            topic_port_request = {'request': 'topic_port_mapping'}
-            self.broker_reg_socket.send_string(json.dumps(topic_port_request))
-            # Listen for broker to publish about topics
-            received_message = self.broker_reg_socket.recv_string()
+            # Get topics/ports mapping from received_message
             self.setup_broker_topic_port_connections(received_message)
             self.debug(f"Successfully set up broker topic/port connections")
         self.info("Registration successful")
@@ -155,14 +150,16 @@ class Subscriber:
 
     def setup_broker_topic_port_connections(self, received_message):
         """ Method to set up one socket per topic to listen to the broker
-        where each topic is published from a different port on the broker address """
-        broker_port_dict = json.loads(received_message)
-        self.debug("Broker port dict: {broker_port_dict}")
+        where each topic is published from a different port on the broker address
+        Args: received_message (dict) - message received from broker containing mapping
+        between topics published from the broker and ports on which they will be published
+        """
+        self.debug(f"Broker port dict: {received_message}")
         # Broker will provide the published events so
         # create socket to receive message from broker
         for topic in self.topics:
             # Get the port on which the broker publishes about this topic
-            broker_port = broker_port_dict[topic]
+            broker_port = received_message[topic]
             # One SUB socket per topic
             self.sub_socket_dict[topic] = self.context.socket(zmq.SUB)
             self.poller.register(self.sub_socket_dict[topic], zmq.POLLIN)
@@ -193,6 +190,9 @@ class Subscriber:
             self.notify_sub_socket.send_string("Notification Acknowledged. New publishers added.")
 
     def parse_publish_event(self, topic=""):
+        """ Method to parse a published event for a given topic
+        Args: topic (string) - topic this publish event corresponds to
+         """
         self.debug(f"Waiting for publish event for topic {topic}")
         # received_message = self.sub_socket_dict[topic].recv_string()
         [topic, received_message] = self.sub_socket_dict[topic].recv_multipart()
@@ -208,15 +208,14 @@ class Subscriber:
 
 
     def notify(self):
-        """ Notify method functions independently of dissemination method,
-        underlying poller and sockets are either connected only to the broker
-        (centralized) or are connected directly to the source publishers """
+        """ Method to poll for published events (or notifications about
+        new publishers from broker) either indefinitely
+        (if indefinite=True in constructor) or until max_event_count
+        (passed to constructor) is reached. """
         self.debug("Start to receive message")
         if self.indefinite:
             while True:
-                self.debug("Polling for new events...")
                 events = dict(self.poller.poll())
-                self.debug("Got events!")
                 if self.notify_sub_socket in events:
                     # This is a notification about new publishers
                     self.parse_notification()
@@ -238,6 +237,7 @@ class Subscriber:
                             self.parse_publish_event(topic=topic)
 
     def write_stored_messages(self):
+        """ Method to write all stored messages to filename passed to constructor """
         self.info(f"Writing all stored messages to {self.filename}")
         if self.filename:
             with open(self.filename, 'w') as f:
@@ -281,14 +281,6 @@ class Subscriber:
             self.context.destroy()
         except Exception as e:
             logging.error(f'Could not destroy ZMQ context successfully - {str(e)}', extra=self.prefix)
-
-    def subscribe_to_new_topics(self, topics=[]):
-        """ Method to add additional subscriptions/topics of interest for this subscriber
-        Args:
-        - topics (list) : list of new topics to add to subscriptions if not already added """
-        for t in topics:
-            if t not in self.topics:
-                self.topics.append(t)
 
     def info(self, msg):
         logging.info(msg, extra=self.prefix)
