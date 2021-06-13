@@ -317,10 +317,16 @@ where `self` refers to an instance of one of the above Classes.
             centralized_perf_test.test_tree_topology(depth=depth, fanout=fanout)
     ```
 
-    For each virtualized network, every subscriber in the respective embedded Publish/Subscribe system writes out its performance data into a file like: 
-    
-    **src/performance_tests/data/[centralized,decentralized]/<network name, e.g. "**tree-d3f2-8hosts**" for a tree topology with depth=3, fanout=2>/subscriber-<index, i.e. which subscriber this is for the current system>**
+For each virtualized network, every subscriber in the respective embedded Publish/Subscribe system writes out its performance data into a file like: 
 
-    From there, we are able to extract the written data and generate plots to visualize the patterns that exist within it. 
+**src/performance_tests/data/[centralized,decentralized]/<network name, e.g. "**tree-d3f2-8hosts**" for a tree topology with depth=3, fanout=2>/subscriber-<index, i.e. which subscriber this is for the current system>**
 
-    ### Patterns Found 
+From there, we are able to extract the written data and generate plots to visualize the patterns that exist within it. 
+
+## Patterns Found 
+There are several interesting observations can be made from the tests that have been run within the Performance Testing Framework:
+1. The latency with direct dissemination is in general smaller than that with centralized dissemination.
+2. The distribution of latency for direct dissemination is more uniformly distributed without outliers, while there are extra large latencies with centralized dissemination
+3. With an increased number of publishers and subscribers, the latency increases for both direct and centralized dissemination.
+4. The impact of increased number of publishers and subscribers on centralized dissemination is larger than that on direct dissemination.
+5. The relationship between the increase of latency and the increase of publishers/subscribers are non-linear. It seems to be a quadratic relationship. More testing is required to confirm this.
