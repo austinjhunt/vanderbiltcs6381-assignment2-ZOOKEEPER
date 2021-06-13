@@ -283,6 +283,44 @@ A couple of key things to note with the driver:
 * You cannot currently pass a COUNT greater than 1 to `--subscriber COUNT`, `--publisher COUNT`, or `--broker COUNT` because multiprocessing on the driver side has not been implemented. With the current structure of the driver, for example, if you want to create 3 Subscribers (`--subscriber 3`) with one call, the driver would enter a 3-iteration loop, where each iteration 1) creates a subscriber, 2) configures the subscriber, and 3) starts the either *indefinite* or *N max events* `notify()` loop for the subscriber. This `notify()` method of the subscriber is blocking, which prevents the 2nd and 3rd subscribers from being created until the first disconnects. Multiprocessing would allow the notify() call to be non-blocking and thus would allow the creation/execution of multiple subscribers per driver.py call. This same problem exists with the Publisher's `publish()` method. For the Broker, the limit is 1 because the general project architecture does not currently support a multiple-broker Publish/Subscribe system.
         * HOWEVER, you can still create multiple Publishers (or multiple Subscribers) per host, just using separated driver calls with `--publisher 1` or `--subscriber 1`
 
-## Unit Testing
+## Unit Testing [(src/unit_tests)](src/unit_tests/README.md)
+
+The Unit Testing module (which uses [unittest](https://docs.python.org/3/library/unittest.html)) is designed to test those methods of the Publisher, Subscriber, and Broker classes whose functionality can be tested independently of a full Publish/Subscribe system. This module does not test things like registration, message sending, and message receiving, since those methods depend on the Publish/Subscribe system as a whole. This module tests some foundational basic units responsible for things like randomized port selection, host IP address determination, publish event generation, and file writing.
 
 ## Performance Testing
+
+The Performance Testing module uses [The Python API for Mininet](https://github.com/mininet/mininet/wiki/Introduction-to-Mininet) in combination with [The Driver](src/driver.py) to automatically spin up a series of different virtualized network topologies through Mininet (all with Python) and embed a unique Publish/Subscribe system into each of those topologies for the purpose of collecting file-written performance data (via the `--filename` argument to the Subscriber) to understand how Publish/Subscribe latency is impacted by things like: 
+* Number of hosts (# pubs, # subs) in the system
+* Dissemination model (centralized vs decentralized)
+* Topology type (e.g. single switch vs. tree topology)
+as well as how the above variables relate in regard to latency. 
+
+The Performance Testing module is split into two main classes: 
+* [(CentralizedPerformanceTest)](src/performance_tests/centralized.py) - for testing performance of centralized dissemination pub/sub systems along various network topologies and various counts of publishers and subcribers
+* [(DecentralizedPerformanceTest)](src/performance_tests/decentralized.py) - for testing performance of decentralized dissemination pub/sub systems along various network topologies and various counts of publishers and subcribers
+
+Both of the above classes can be configured along: 
+* The number of events to collect data for (sample size) within a given pub sub system
+* The event interval (the argument to `--sleep` when creating a publisher indicating the number of seconds to sleep between publish events)
+* The **wait factor**. When the virtualized network is spun up and the Pub/Sub system begins executing in the background, we need to wait some amount of time for that Pub/Sub system to generate and write the data we are interested in. Specifically, the subscriber is responsible for writing the performance data to a file, and it only writes this data once the event count (item 1 in this list) is reached. This wait time for a given test is calculated as: 
+`wait_time = self.wait_factor * (self.num_events * self.event_interval)`
+where `self` refers to an instance of one of the above Classes. 
+    * Since the amount of time we need to wait for each subscriber in the system to receive and write all of their expected events certainly needs to scale with the number of hosts in the system, we added a **setWaitFactor(factor)** method to the testing classes allowing for the wait factor to be updated with respect to a changing number of hosts. For example: 
+    ```
+    # Min = 4 hosts, Max = 256 hosts
+    for depth in range(2,5):
+        for fanout in range(2,5):
+            # Adjust the wait factor as number of hosts grows.
+            centralized_perf_test.setWaitFactor(factor=depth*fanout)
+            
+            # Test centralized pub sub with this tree topology
+            centralized_perf_test.test_tree_topology(depth=depth, fanout=fanout)
+    ```
+
+    For each virtualized network, every subscriber in the respective embedded Publish/Subscribe system writes out its performance data into a file like: 
+    
+    **src/performance_tests/data/[centralized,decentralized]/<network name, e.g. "**tree-d3f2-8hosts**" for a tree topology with depth=3, fanout=2>/subscriber-<index, i.e. which subscriber this is for the current system>**
+
+    From there, we are able to extract the written data and generate plots to visualize the patterns that exist within it. 
+
+    ### Patterns Found 

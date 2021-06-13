@@ -37,12 +37,6 @@ class TestSubscriber(unittest.TestCase):
         assert not self.subscriber.indefinite
         assert self.subscriber.max_event_count == 15
 
-    def test_subscribe_to_new_topics(self):
-        new_topics = ['C','D','E']
-        # C already in subscriber topics, test the merge
-        self.subscriber.subscribe_to_new_topics(new_topics)
-        assert self.subscriber.topics == ['A','B','C','D','E']
-
     def test_get_host_address(self):
         """ Test the get_host_address() method. Since the unittests will not
         be run in mininet, this address will always be 127.0.0.1. Mininet
