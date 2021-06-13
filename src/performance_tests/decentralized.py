@@ -6,7 +6,6 @@ from mininet.node import OVSController
 
 class CentralizedTest(unittest.TestCase):
     # All centralized tests
-    publisher_command 
 
     def test_single_switch_topology(self, subscribers=1, publishers=1):
         "Create and test a simple network"
