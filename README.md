@@ -1,3 +1,13 @@
+# A Python Publish / Subscribe Distributed System Framework Built on top of [ZeroMQ, an asynchronous messaging library](https://zeromq.org/)
+
+This project offers a framework for spinning up a publish/subscribe system either on a single host or on a virtualized network with a tool like [Mininet](http://mininet.org/). It offers two main models of message dissemination, namely: 
+1. centralized dissemination, where a central broker "subscribes" to publishers and forwards published messages appropriately to subscribers whose subscriptions match the published messages. This model offers anonymization (de-coupling) between publishers and subscribers, where each only needs to know about the broker and not about each other. This method also means the broker increasingly becomes a bottleneck as the number of publishers/subscribers grows.
+2. Decentralized dissemination, where a central broker simply registers publishers and subscribers, and notifies subscribers about the IP addresses of the publishers that publish topics they are interested in so the subscribers can connect to those publishers directly. With this model, there is coupling between the publishers and subscribers in that the subscribers have to know the publisher IP addresses and listen to them directly, but there is also no need to funnel all published messages through the broker. 
+
+The project also offers integrated performance / latency analysis by allowing you to configure subscribers to write out latency data (between publishers and subscribers) to a provided filename, which provide insight about how long it takes for messages with specific topics from specific publishers to reach the subscriber (this is done by including the publish time in the message that gets sent).
+
+
+
 
 ## Architecture
 
