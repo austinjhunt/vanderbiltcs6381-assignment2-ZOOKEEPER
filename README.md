@@ -6,6 +6,8 @@ The following sections provide an overview of the basic architecture of this pro
 
 ### The Subscriber [(src/lib/subscriber.py)](src/lib/subscriber.py)
 
+The following is a high level outline of the Subscriber's under-the-hood mechanics.
+
 #### Constructor
 ```
 subscriber = Subscriber(
@@ -86,25 +88,171 @@ def parse_notification(self):
  ```
  This format, simple as it is, was chosen for the purpose of performance testing, where we are interested in latencies between specific Pub/Sub pairs across various virtualized network topologies, where these performance tests are run using [Mininet](http://mininet.org/walkthrough/), seen (for example) in [src/performance_tests/centralized.py](src/performance_tests/centralized.py).
 
+ Side note: when the subscriber disconnects (when subscriber.disconnect() is called), it disconnects from the pub/sub system **cleanly** by first notifying the broker that it is leaving so that the broker can remove the relevant data associated with the exiting subscriber. Otherwise, it's easy to reach a situation in which the broker tries sending a message to a subscriber that no longer exists, and the broker hangs, which can hang the full system.
+
 #### The Broker Address
 The subscriber **must** be provided the IP address of the broker, which also means that the **broker must be created before the subscriber**. This tells the subscriber either 1) where to listen for notifications about new publisher IP addresses (in the case of decentralized dissemination), or 2) where to listen for publish events (in the case of centralized broker dissemination)
 
 #### The Topics
-Of course, you can't have a real subscriber if they aren't subscribing to anything. The topics provided to the constructor tell the subscriber what to subscribe to, and this list of topics (which could just be one topic) are sent to the broker during registration (via ```register_pub```) so that the broker can either 1) tell the subscriber about the addresses of new publishers of that topic when they join (for *decentralized dissemination*) or 2) forward published events that match those topic subscriptions from publishers to the subscriber when they are published (for *centralized dissemination*)
+Of course, you can't have a real subscriber if they aren't subscribing to anything. The topics provided to the constructor tell the subscriber what to subscribe to, and this list of topics (which could just be one topic) are sent to the broker during registration (via ```register_sub```) so that the broker can either 1) tell the subscriber about the addresses of new publishers of that topic when they join (for *decentralized dissemination*) or 2) forward published events that match those topic subscriptions from publishers to the subscriber when they are published (for *centralized dissemination*)
 
 #### Centralized or Not
-This is perhaps the most important configuration parameter, as it governs the path of a lot of the internal logic of the subscriber. The same is true for the publisher and the broker, as well. In short, if centralized is set to True in the constructor, the subscriber listens only to the broker for published events; basically, in this case, the broker is the one publisher in the distributed system. With centralized dissemination, of course, there is the issue of the broker representing a bottleneck in the system, which means it is more likely that the latency between the original publisher and the subscriber will be greater, so you have the option of setting centralized to False. If you do this, the subscriber will 1) listen for notification events from the broker about IP addresses of newly joined publishers that are publishing a topic of interest, AND 2) listen directly to the publishers (about which the subscriber was notified) for publish events. This **decentralized dissemination method** lessens the load on the Broker and decreases latency between the original publisher(s) and the subscriber, since the connection is direct.
-
- where with many publishers and many subscribers, the broker has to receive and process all published events and forward them if necessary to subscribers whose subscriptions match those events. So,
+This is perhaps the most important configuration parameter, as it governs the path of a lot of the internal logic of the subscriber. The same is true for the publisher and the broker, as well. In short, if centralized is set to **True** in the constructor, the subscriber listens **only to the broker** for published events; basically, in this case, the broker is the one publisher in the distributed system. With **centralized dissemination**, of course, there is the issue of the broker representing a bottleneck in the system, which means it is more likely that the latency between the original publisher and the subscriber will be greater, so you have the option of setting centralized to **False**. If you do this, the subscriber will **1)** listen for notification events from the broker about IP addresses of newly joined publishers that are publishing a topic of interest, AND **2)** listen directly to the publishers (about which the subscriber was notified) for publish events. This **decentralized dissemination method** lessens the load on the Broker and decreases latency between the original publisher(s) and the subscriber, since the connection is direct.
 
 
 ### The Publisher [(src/lib/publisher.py)](src/lib/publisher.py)
-Class representing a publisher. One or more publishers can be created at a time using the driver. If you create more than one publisher at a time (e.g. ./driver.py --publisher N>1 ), the first publisher will be bound to the bind port you specify (or 5556 if none specified), then the following publisher will be bound to the next port, etcetera. The publisher publishes information independently of the subscriber classes, so if it publishes an update for a topic no subscriber is subscribed to, the publish event just gets dropped. The publisher passes the time of publish as part of the published message, so if a subscriber receives that message, it is able to calculate the difference between publish time and receive time for performance testing with different network topologies. The publisher can publish updates indefinitely (with --indefinite argument to driver.py) or can publish only a specific number of events (with --max_event_count COUNT argument to driver.py). If you pass both --indefinite and --max_event_count COUNT to the driver, indefinite takes priority.
+The following is a high level outline of the Publisher's under-the-hood mechanics.
+#### Constructor
+```
+publisher = Publisher(
+    broker_address=<IP address of broker (created before publisher)>,
+    topics=<list of topics to publish>,
+    indefinite=<whether to publish events indefinitely, default false>,
+    max_event_count=<max number of events to publish if not indefinite>,
+    sleep_period=<interval in seconds between each publish event, default 1>,
+    bind_port=<port on which to bind the event publishing socket>
+)
+```
+
+#### Underlying Methods
+```
+def configure(self):
+    """ Method to perform initial configuration of Publisher """
+
+def setup_port_binding(self):
+    """
+    Method to bind socket to network address to begin publishing/accepting client connections
+    using bind_port specified. If bind_port already in use, increment and keep trying until success. Final bind port for event publishing will be >= initial bind_port constructor argument.
+    """
+
+def register_pub(self):
+    """ Method to register this publisher with the broker """
+
+def get_host_address(self):
+    """ Method to return IP address of current host.
+    If using a mininet topology, use netifaces (socket.gethost... fails on mininet hosts)
+    Otherwise, local testing without mininet, use localhost 127.0.0.1 """
+
+def generate_publish_event(self, iteration=0):
+    """ Method to generate a publish event
+    Args:
+    - iteration (int) - current publish event iteration for this publisher,
+    used to determine topic to publish using iteration % len(topics) """
+
+def publish(self):
+    """ Method to publish events either indefinitely or until a max event count
+    is reached """
+
+def disconnect(self):
+    """ Method to disconnect from the pub/sub network """
+```
+The publisher is the most **indifferent** entity in the Pub/Sub system. Notice that you do not need to tell the publisher if the Pub/Sub system is centralized or not, because the internal logic of the publisher functions the same either way. Whether the system is using a **centralized dissemination model** (broker receives/forwards all events to subscribers) or a **decentralized dissemination model** (broker notifies subscribers about publisher addresses for direct connections), the publisher simply 1) registers with the broker, and 2) publishes events. From there, it's up to the **subscribers** and the **broker** to determine who to connect to for what content depending on a **centralized=True/False** parameter. The publisher passes the time of publish as part of the published message so that if a subscriber receives that message, it is able to calculate the difference between publish time and receive time for performance testing with different network topologies.
+
+Like the Subscriber, the Publisher is configurable along a number of variables, outlined below.
+
+#### How Long to Publish
+Similar to the Subscriber, the Publisher accepts an ```indefinite``` argument indicating whether to publish events indefinitely, and if False, how many events to publish specifically. An interesting thing to note here is that if not publishing indefinitely, then a Publisher's maximum event count is the hard limiting factor for a pairing between that Publisher and a subscriber to one of that Publisher's topics. If a Publisher is publishing topic A events and a Subscriber is receiving those events, then even if Subscriber A is supposed to have a max event count of 50, it will not reach that event count if the Publisher's max event count is 10. Granted, that is assuming the Publisher in this case is the only publisher of topic A. You can't consume what isn't being produced. On the flip side, if you configure a Publisher to publish indefinitely, and a Subscriber to subscribe for a max event count, (and we assume this is the only pub/sub pair), then all published events after that max event count will simply be **dropped**, as no one will be left consuming those published events. **Generally speaking, a published event with no subscriber will always be dropped.** In this case, "Subscriber" could refer to a Subscriber object or a Broker object "subscribing" to that publisher with a max event count to forward a specific number of events to interested subscribers.
+
+#### The Broker Address
+The publisher must be provided the IP address of the broker, which also means that the broker must be created before the publisher. This tells the publisher who to register with, where a publisher must be registered in order for a subscriber to consume what they are publishing, regardless of the dissemination method.
+
+#### The Topics
+A publisher must have something to publish. The topics provided to the constructor tell the publisher what to publish, and this list of topics (which could just be one topic) are sent to the broker during registration (via ```register_pub```) so that the broker can either 1) notify all subscribers subscribed to this publisher's topic(s) about the IP address of this new publisher (for **decentralized dissemination**), or 2) forward events published by this publisher to subscribers that are subscribed to the respective topics (for **centralized dissemination**)
+
+#### Sleep Interval
+The sleep interval (or ```sleep_period```) defines how long to wait (in seconds) between each publish event. The default is 1 second. Note: this sleep period does not affect the time it takes for a published event to reach a subscriber.
+
 
 ### The Broker [(src/lib/broker.py)](src/lib/broker.py)
+The following is a high level outline of the Broker's under-the-hood mechanics. It should be noticeable (when comparing the outline to those of the Subscriber and Publisher) that the Broker holds the most responsibility and internal logic in a Pub/Sub distributed system.
+#### Constructor
+```
+publisher = Broker(
+    centralized=<whether publish subscribe system uses centralized broker dissemination>
+    indefinite=<whether to listen for events indefinitely, default false>,
+    max_event_count=<max number of events to publish if not indefinite>,
+)
+```
 
-## Setup
-The setup directory contains bash scripts that provide an abstraction layer above the driver.py script for use with automation. If you want to spin up a set of publishers on a host, use ./setup_publishers.sh with arguments outlined in the script, and alternatively if you want to spin up a set of subscribers (or just one) on a host, use ./setup_subscribers.sh with arguments outlined in the script.
+#### Underlying Methods
+```
+def configure(self):
+    """ Method to perform initial configuration of Broker entity """
+
+def parse_events(self, index):
+    """ BOTH CENTRAL AND DECENTRALIZED DISSEMINATION
+    Parse events returned by ZMQ poller and handle accordingly
+    Args:
+    - index (int) - event index, just used for logging current event loop index
+        """
+def event_loop(self):
+    """ BOTH CENTRAL AND DECENTRALIZED DISSEMINATION
+    Poll for events either indefinitely or until a specific
+    event count (self.max_event_count, passed in constructor) is reached """
+
+def update_receive_socket(self):
+    """ CENTRALIZED DISSEMINATION
+    Once publisher registers with broker, broker will begin receiving messages from it
+    for a given topic; broker must open a SUB socket for the topic if not already opened"""
+
+def send(self, topic):
+    """ CENTRALIZED DISSEMINATION
+    Take a received message for a given topic and forward
+    that message to the appropriate set of subscribers using
+    send_socket_dict[topic] """
+
+def get_clear_port(self):
+    """ Method to get a clear port that has not been allocated """
+
+def disconnect_sub(self, msg):
+    """ Method to remove data related to a disconnecting subscriber """
+
+def register_sub(self):
+    """ BOTH CENTRAL AND DECENTRALIZED DISSEMINATION
+    Register a subscriber address as interested in a set of topics """
+
+def notify_subscribers(self, topics, pub_address=None, sub_id=None):
+    """ DECENTRALIZED DISSEMINATION
+    Tell the subscribers of a given topic that a new publisher
+    of this topic has been added; they should start listening to
+    that/those publishers directly """
+
+def disconnect_pub(self, msg):
+    """ Method to remove data related to a disconnecting publisher """
+
+def register_pub(self):
+    """ BOTH CENTRAL AND DECENTRALIZED DISSEMINATION
+    Register (or disconnect) a publisher as a publisher of a given topic,
+    e.g. 1.2.3.4 registering as publisher of topic "XYZ" """
+
+def get_host_address(self):
+    """ Method to return IP address of current host.
+    If using a mininet topology, use netifaces (socket.gethost... fails on mininet hosts)
+    Otherwise, local testing without mininet, use localhost 127.0.0.1 """
+
+def update_send_socket(self):
+    """ CENTRALIZED DISSEMINATION
+    Once a subscriber registers with the broker, the broker must
+    create a socket to publish the topic; the broker will let the
+    subscriber know the port """
+
+def disconnect(self):
+    """ Method to disconnect from the publish/subscribe system by destroying the ZMQ context """
+```
+
+The Broker class holds a number of responsibilities, which vary depending on the dissemination model, namely:
+* With Both Dissemination Models
+  * Registering subscribers and mapping them to topics they are interested in
+  * Registering publishers and mapping them to topics they publish
+  * Handling clean and reliable ad-hoc connections and disconnections for both publishers and subscribers
+* With the Decentralized Dissemination Model
+  * Upon subscriber registration, notifying that subscriber about the IP addresses of all publishers that publish topics that subscriber is interested in
+  * Upon publisher registration, notifying the subscribers that are subscribed to that publisher's topics about the IP address of that new publisher
+* With the Centralized Dissemination Model
+  * Listening for and receiving published events from newly registered publishers as a "subscriber"
+  * Forwarding those received events to subscribers who are registered as interested in the event topics, if any. If none, then drop events.
+  * Upon publisher registration (with new topics being published), setting up a local (on the Broker) publishing/forwarding mechanism for each of that publisher's topics and subsequently notifying that topic's subscribers (if any) about it so they can listen to the Broker for forwarded messages with that topic
+
 
 ## Unit Testing
 

@@ -73,12 +73,6 @@ class Broker:
         self.used_ports.append(5555)
         self.used_ports.append(5556)
 
-        # if not self.centralized:
-        #     logging.debug("Enabling subscriber notification (about publishers) on port 5557",
-        #         extra=self.prefix)
-        #     self.notify_sub_socket = self.context.socket(zmq.REQ)
-        #     self.notify_sub_socket.bind("tcp://*:5557")
-
         # register these sockets for incoming data
         logging.debug("Register sockets with a ZMQ poller", extra=self.prefix)
         self.poller.register(self.pub_reg_socket, zmq.POLLIN)
@@ -403,6 +397,7 @@ class Broker:
                 self.send_socket_dict[topic].bind(f"tcp://{self.get_host_address()}:{port}")
 
     def disconnect(self):
+        """ Method to disconnect from the publish/subscribe system by destroying the ZMQ context """
         try:
             logging.info("Disconnecting. Destroying ZMQ context..", extra=self.prefix)
             self.context.destroy()
