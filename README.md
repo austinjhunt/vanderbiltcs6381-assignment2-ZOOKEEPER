@@ -281,6 +281,7 @@ The driver script was created to facilitate a modular implementation of performa
 A couple of key things to note with the driver: 
 * You cannot pass a mix of `--subscriber`, `--publisher`, and `--broker`; you can only create one type of entity per driver.py call
 * You cannot currently pass a COUNT greater than 1 to `--subscriber COUNT`, `--publisher COUNT`, or `--broker COUNT` because multiprocessing on the driver side has not been implemented. With the current structure of the driver, for example, if you want to create 3 Subscribers (`--subscriber 3`) with one call, the driver would enter a 3-iteration loop, where each iteration 1) creates a subscriber, 2) configures the subscriber, and 3) starts the either *indefinite* or *N max events* `notify()` loop for the subscriber. This `notify()` method of the subscriber is blocking, which prevents the 2nd and 3rd subscribers from being created until the first disconnects. Multiprocessing would allow the notify() call to be non-blocking and thus would allow the creation/execution of multiple subscribers per driver.py call. This same problem exists with the Publisher's `publish()` method. For the Broker, the limit is 1 because the general project architecture does not currently support a multiple-broker Publish/Subscribe system.
+        * HOWEVER, you can still create multiple Publishers (or multiple Subscribers) per host, just using separated driver calls with `--publisher 1` or `--subscriber 1`
 
 ## Unit Testing
 
