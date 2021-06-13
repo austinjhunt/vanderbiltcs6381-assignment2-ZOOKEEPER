@@ -73,12 +73,6 @@ class Broker:
         self.used_ports.append(5555)
         self.used_ports.append(5556)
 
-        # if not self.centralized:
-        #     logging.debug("Enabling subscriber notification (about publishers) on port 5557",
-        #         extra=self.prefix)
-        #     self.notify_sub_socket = self.context.socket(zmq.REQ)
-        #     self.notify_sub_socket.bind("tcp://*:5557")
-
         # register these sockets for incoming data
         logging.debug("Register sockets with a ZMQ poller", extra=self.prefix)
         self.poller.register(self.pub_reg_socket, zmq.POLLIN)
@@ -213,6 +207,7 @@ class Broker:
             sub_reg_string = self.sub_reg_socket.recv_string()
             # Get topics and address of subscriber
             sub_reg_dict = json.loads(sub_reg_string)
+
             # Handle disconnect if requested
             if 'disconnect' in sub_reg_dict:
                 response = self.disconnect_sub(msg=sub_reg_dict)
@@ -220,15 +215,6 @@ class Broker:
                 self.sub_reg_socket.send_string(response)
                 return
 
-            if not self.centralized:
-                # Allocate a random unique port to notify this subscriber about new hosts.
-                # Port must be different for each subscriber since they are each polling
-                # and subscribers steal poll pipeline events from each other.
-                notify_port = self.get_clear_port()
-                msg = {'register_sub': {'notify_port': notify_port}}
-            else:
-                msg = {'register_sub': 'welcome, new subscriber'}
-            self.sub_reg_socket.send_string(json.dumps(msg))
             topics = sub_reg_dict['topics']
             sub_address = sub_reg_dict['address']
             sub_id = sub_reg_dict['id']
@@ -237,7 +223,13 @@ class Broker:
                     self.subscribers[topic] = [sub_address]
                 else:
                     self.subscribers[topic].append(sub_address)
+
             if not self.centralized:
+                # Allocate a random unique port to notify this subscriber about new hosts.
+                # Port must be different for each subscriber since they are each polling
+                # and subscribers steal poll pipeline events from each other.
+                notify_port = self.get_clear_port()
+                msg = {'register_sub': {'notify_port': notify_port}}
                 ## Notify new subscriber about all publishers of topic
                 ## so they can listen directly
                 # Set up a new notify socket on a clear port for this subscriber
@@ -247,14 +239,8 @@ class Broker:
                 self.used_ports.append(notify_port)
                 self.notify_sub_sockets[sub_id].bind(f"tcp://*:{notify_port}")
                 self.notify_subscribers(topics=topics, sub_id=sub_id)
+                self.sub_reg_socket.send_string(json.dumps(msg))
             else:
-
-                # Take a request for the topic/port mapping
-                topic_port_request = self.sub_reg_socket.recv_string()
-                logging.debug(
-                    f"Topic/Port request from subscriber: {topic_port_request}",
-                    extra=self.prefix)
-
                 ## Make sure there is a socket for each new topic.
                 self.update_send_socket()
 
@@ -264,10 +250,9 @@ class Broker:
                     reply_sub_dict[topic] = self.send_port_dict[topic]
                 logging.debug(f"Sending topic/ports: {reply_sub_dict}", extra=self.prefix)
                 self.sub_reg_socket.send_string(json.dumps(reply_sub_dict, indent=4))
-            # response = {'success': f'registration complete - {random.randint(1,10)}'}
+
             logging.debug("Subscriber registered successfully", extra=self.prefix)
         except Exception as e:
-            # response = {'error': f'registration failed due to exception: {e}'}
             logging.error(e, extra=self.prefix)
 
     def notify_subscribers(self, topics, pub_address=None, sub_id=None):
@@ -412,6 +397,7 @@ class Broker:
                 self.send_socket_dict[topic].bind(f"tcp://{self.get_host_address()}:{port}")
 
     def disconnect(self):
+        """ Method to disconnect from the publish/subscribe system by destroying the ZMQ context """
         try:
             logging.info("Disconnecting. Destroying ZMQ context..", extra=self.prefix)
             self.context.destroy()

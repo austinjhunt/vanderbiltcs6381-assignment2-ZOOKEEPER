@@ -127,9 +127,9 @@ class Publisher:
         return event
 
 
-    # Assumption:
-    # Publisher is only going to publish a limited number of topics.
     def publish(self):
+        """ Method to publish events either indefinitely or until a max event count
+        is reached """
         if self.indefinite:
             i = 0
             while True:

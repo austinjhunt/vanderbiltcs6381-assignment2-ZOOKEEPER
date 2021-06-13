@@ -29,6 +29,11 @@ class CentralizedDisseminationPubSubPerformanceTest:
     def debug(self, msg):
         logging.debug(msg, extra=self.prefix)
 
+    def setWaitFactor(self, factor):
+        """ Method to update the wait factor (to wait <factor> times as long
+        as num events * event interval for pub sub to generate data """
+        self.wait_factor = factor
+
     def create_network(self, topo=None):
         """ Handle pre-cleanup if necessary """
         network = None
@@ -122,8 +127,7 @@ class CentralizedDisseminationPubSubPerformanceTest:
             self.debug("Publishers created!")
 
             # Scale the wait time by a constant factor and with number of hosts
-            # Decided to add 40% of num_hosts in seconds as additional constant time
-            wait_time = self.wait_factor * (self.num_events * self.event_interval) + (num_hosts * .4)
+            wait_time = self.wait_factor * (self.num_events * self.event_interval)
             self.debug(f"Waiting for {wait_time} seconds for data to generate...")
             time.sleep(wait_time)
             self.debug(f"Finished waiting! Killing processes...")
@@ -180,5 +184,7 @@ if __name__ == "__main__":
 
     # Min = 4 hosts, Max = 256 hosts
     for depth in range(2,5):
-            for fanout in range(2,5):
-                centralized_perf_test.test_tree_topology(depth=depth, fanout=fanout)
+        for fanout in range(2,5):
+            # Adjust the wait factor as number of hosts grows. fanout * 3 = (6->12)
+            centralized_perf_test.setWaitFactor(factor=depth*fanout)
+            centralized_perf_test.test_tree_topology(depth=depth, fanout=fanout)
