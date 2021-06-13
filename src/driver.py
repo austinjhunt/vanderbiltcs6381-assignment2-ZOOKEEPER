@@ -7,7 +7,7 @@ from multiprocessing import Process
 
 driver_logging_prefix = {'prefix': 'DRIVER'}
 
-def create_publishers(count=1, topics=[], broker_address='127.0.0.1', # own_address='127.0.0.1',
+def create_publishers(count=1, topics=[], broker_address='127.0.0.1',
     sleep_period=1, bind_port=5556, indefinite=False, max_event_count=15):
     """ Method to create a set of publishers.
     In order to run multiple subscribers simultaneously,
@@ -41,7 +41,7 @@ def create_publishers(count=1, topics=[], broker_address='127.0.0.1', # own_addr
 
     return pubs
 
-def create_subscribers(count=1, filename=None, broker_address='127.0.0.1', # own_address='127.0.0.1',
+def create_subscribers(count=1, filename=None, broker_address='127.0.0.1',
      centralized=False, topics=[], indefinite=False, max_event_count=15):
     """ Method to create a set of subscribers. In order to run multiple subscribers simultaneously,
     need to use multiprocessing library, because Subscriber.listen() will block for i in range(count)

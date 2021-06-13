@@ -96,7 +96,7 @@ class Subscriber:
 
     def register_sub(self):
         """ Register self with broker """
-        self.debug("Registering with broker")
+        self.debug(f"Registering with broker at {self.broker_address}:5556")
         message_dict = {'address': self.get_host_address(), 'id': self.id, 'topics': self.topics}
         message = json.dumps(message_dict, indent=4)
         self.broker_reg_socket.send_string(message)

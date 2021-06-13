@@ -82,7 +82,7 @@ class Publisher:
 
     def register_pub(self):
         """ Method to register this publisher with the broker """
-        logging.debug(f"Registering with broker at {self.broker_address}", extra=self.prefix)
+        logging.debug(f"Registering with broker at {self.broker_address}:5555", extra=self.prefix)
         message_dict = {'address': self.get_host_address(), 'topics': self.topics,
             'id': self.id}
         message = json.dumps(message_dict, indent=4)
