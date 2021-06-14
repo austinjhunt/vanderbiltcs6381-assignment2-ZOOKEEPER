@@ -2,7 +2,7 @@
 execute and can be tested independently of the publish/subscribe network """
 import unittest
 from src.lib.broker import Broker
-from . import *
+from src.unit_tests import *
 
 class TestBroker(unittest.TestCase):
     broker = None

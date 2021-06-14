@@ -7,8 +7,6 @@ This project offers a framework for spinning up a publish/subscribe system eithe
 The project also offers integrated performance / latency analysis by allowing you to configure subscribers to write out latency data (between publishers and subscribers) to a provided filename, which provide insight about how long it takes for messages with specific topics from specific publishers to reach the subscriber (this is done by including the publish time in the message that gets sent).
 
 
-
-
 ## Architecture
 
 The following sections provide an overview of the basic architecture of this project, outlining the core entities that interact to form a fully-functional Publish-Subscribe distributed system with optional broker-based anonyomization between publishers and subscribers.
