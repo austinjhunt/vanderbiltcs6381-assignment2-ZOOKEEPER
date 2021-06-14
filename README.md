@@ -9,7 +9,7 @@ The project also offers integrated performance / latency analysis by allowing yo
 ## Development Environment
 To work with this system, you should do the following:
 1. Install [VirtualBox](https://www.virtualbox.org/)
-2. Set up an Ubuntu Server (or Desktop) 20.04 virtual machine within VirtualBox. You can download the Ubuntu .iso file [here](https://ubuntu.com/download/server). You can follow [these instructions](https://www.youtube.com/watch?v=x5MhydijWmc) to set up your Ubuntu VM.
+2. Set up an Ubuntu Desktop 20.04 virtual machine within VirtualBox. You can download the Ubuntu .iso file [here](https://ubuntu.com/download/server). You can follow [these instructions](https://www.youtube.com/watch?v=x5MhydijWmc) to set up your Ubuntu VM.
 3. Pausing on the VM for now, clone this repository to a directory of your choice on your computer.
 ``` git clone https://github.com/austinjhunt/vanderbiltcs6381-assignment1-ZMQPUBSUB.git ```
 4. Navigate inside the project folder: `cd vanderbiltcs6381-assignment1-ZMQPUBSUB`
@@ -18,9 +18,10 @@ To work with this system, you should do the following:
 7. Install the Python requirements from the requirements.txt file. `pip install -r requirements.txt`
 8. Now, back to the VM. Once you have created your VM and it's listed in VirtualBox, click on it, then click the Settings option, then go to **Shared Folders** and click the little folder with the '+' button on the right to add a new shared folder. For folder name, use `vanderbiltcs6381-assignment1-ZMQPUBSUB`. For folder path, choose the project folder you just cloned. Leave Read-Only unchecked. Check Auto-Mount. Check Make Permanent. For mount point, use: `/mnt/dev/vanderbiltcs6381-assignment1-ZMQPUBSUB`. This will mount the project from your computer into the Virtual Machine at that location (with the same root folder name).
 9. Start the VM.
-10. Once it is started, open a Terminal Window. Become root with: `sudo -i` and enter your sudo password.
-11. Navigate to the mounted directory.
-12. Run the following commands to install Python3.8 and pip pon your VM.
+10. Once it's started, click the **Devices** option in the top toolbar, then click the **Insert Guest Additions CD Image**. This will allow the shared folder to work.
+11. Open a Terminal Window. Become root with: `sudo -i` and enter your sudo password.
+12. Navigate to the mounted directory.
+13. Run the following commands to install Python3.8 and pip pon your VM.
 ```
 apt update
 apt install software-properties-common
