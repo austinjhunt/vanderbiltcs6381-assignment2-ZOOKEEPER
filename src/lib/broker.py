@@ -240,7 +240,6 @@ class Broker:
                 self.used_ports.append(notify_port)
                 self.notify_sub_sockets[sub_id].bind(f"tcp://*:{notify_port}")
                 self.notify_subscribers(topics=topics, sub_id=sub_id)
-
             else:
                 ## Make sure there is a socket for each new topic.
                 self.update_send_socket()
