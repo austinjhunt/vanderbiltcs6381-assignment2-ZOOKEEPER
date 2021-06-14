@@ -20,8 +20,7 @@ To work with this system, you should do the following:
 9. Start the VM.
 10. Once it's started, click the **Devices** option in the top toolbar, then click the **Insert Guest Additions CD Image**. This will allow the shared folder to work.
 11. Open a Terminal Window. Become root with: `sudo -i` and enter your sudo password.
-12. Navigate to the mounted directory.
-13. Run the following commands to install Python3.8 and pip pon your VM.
+12. Run the following commands to install Python3.8 and pip pon your VM.
 ```
 apt update
 apt install software-properties-common
@@ -38,7 +37,8 @@ git checkout -b mininet-2.3.0 2.3.0
 cd ..
 PYTHON=python3 mininet/util/install.sh -n
 ```
-14. Now install the Python requirements in the VM, this time not using a virtual environment as it complicates things with Mininet.
+14. Navigate to the mounted directory: `/mnt/dev/vanderbiltcs6381-assignment1-ZMQPUBSUB`
+15. Now install the Python requirements in the VM, this time not using a virtual environment as it complicates things with Mininet.
 ```
 pip install -r requirements.txt
 ```
