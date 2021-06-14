@@ -16,7 +16,7 @@ def create_network(self, topo=None):
     """ Method to create a Mininet network with a provided topology;
     handles pre-cleanup if necessary """
 
-def run_network(self, network=None, num_hosts=None, network_name=""):
+def test_network(self, network=None, num_hosts=None, network_name=""):
     """ Interface method; add implementation in subclasses for
     centralized/decentralized performance testing
     args:
@@ -33,18 +33,18 @@ def test_single_switch_topology(self, num_hosts=3):
     """ Create and test Pub/Sub on a Single Switch Topology mininet network
     with a variable number of subscribers and publishers """
 ```
-When creating a performance test, you need to specify **1)** how many events to use as a sample size (which equates to how many records will be written into the data file by the subscriber, where each record indicates the latency for specific message from a specific publisher), **2)** how long to sleep/wait between each publish event (the lower this is, the quicker the test module runs as a whole), and **3)** the wait factor, which is discussed in the main project **README** [here](https://github.com/austinjhunt/vanderbiltcs6381-assignment1-ZMQPUBSUB/tree/master#wait-factor-calculation). The class dynamically handles the cleanup of existing Mininet resources by executing the shell command `mn -c` before running each automated network creation to avoid the `RTNETLINK` error discussed [here](https://github.com/mininet/mininet/issues/737). The `run_network` method of the PerformanceTest class is the only one that does not include an implementation, but requires the subclasses (defined below) to define their own specific implementations for creating either centralized or decentralized Pub/Sub systems within the prepared topologies.
+When creating a performance test, you need to specify **1)** how many events to use as a sample size (which equates to how many records will be written into the data file by the subscriber, where each record indicates the latency for specific message from a specific publisher), **2)** how long to sleep/wait between each publish event (the lower this is, the quicker the test module runs as a whole), and **3)** the wait factor, which is discussed in the main project **README** [here](https://github.com/austinjhunt/vanderbiltcs6381-assignment1-ZMQPUBSUB/tree/master#wait-factor-calculation). The class dynamically handles the cleanup of existing Mininet resources by executing the shell command `mn -c` before running each automated network creation to avoid the `RTNETLINK` error discussed [here](https://github.com/mininet/mininet/issues/737). The `test_network` method of the PerformanceTest class is the only one that does not include an implementation, but requires the subclasses (defined below) to define their own specific implementations for creating either centralized or decentralized Pub/Sub systems within the prepared topologies.
 
 1. [CentralizedPerformanceTest](centralized.py)
 ```
-def run_network(self, network=None, num_hosts=None, network_name=""):
+def test_network(self, network=None, num_hosts=None, network_name=""):
     """ Implementation for centralized performance testing of pub/sub system in provided network
     """
 ```
 
 2. [DecentralizedPerformanceTest](decentralized.py)
 ```
-def run_network(self, network=None, num_hosts=None, network_name=""):
+def test_network(self, network=None, num_hosts=None, network_name=""):
     """ Implementation for decentralized performance testing of pub/sub system in provided network
     """
 ```

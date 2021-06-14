@@ -126,8 +126,10 @@ class Broker:
                 self.parse_events(i)
         else:
             logging.debug(f"Begin finite (max={self.max_event_count}) event poll loop", extra=self.prefix)
-            for i in range(self.max_event_count):
-                self.parse_events(i+1)
+            event_count = 0
+            while event_count < self.max_event_count:
+                self.parse_events(event_count+1)
+                event_count += 1
 
     # once a publisher register with broker, the broker will start to receive message from it
     # for a particular topic, the broker will open a SUB socket for a topic

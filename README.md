@@ -295,6 +295,8 @@ A couple of key things to note with the driver:
 
 The Unit Testing module (which uses [unittest](https://docs.python.org/3/library/unittest.html)) is designed to test those methods of the Publisher, Subscriber, and Broker classes whose functionality can be tested independently of a full Publish/Subscribe system. This module does not test things like registration, message sending, and message receiving, since those methods depend on the Publish/Subscribe system as a whole. This module tests some foundational basic units responsible for things like randomized port selection, host IP address determination, publish event generation, and file writing.
 
+For instructions on executing the unit tests, see the [Unit Tests README](src/unit_tests/README.md).
+
 ## Performance Testing
 
 The Performance Testing module uses [The Python API for Mininet](https://github.com/mininet/mininet/wiki/Introduction-to-Mininet) in combination with [The Driver](src/driver.py) to automatically spin up a series of different virtualized network topologies through Mininet (all with Python) and embed a unique Publish/Subscribe system into each of those topologies for the purpose of collecting file-written performance data (via the `--filename` argument to the Subscriber) to understand how Publish/Subscribe latency is impacted by things like:
@@ -326,11 +328,13 @@ where `self` refers to an instance of one of the above Classes.
             centralized_perf_test.test_tree_topology(depth=depth, fanout=fanout)
     ```
 
-For each virtualized network, every subscriber in the respective embedded Publish/Subscribe system writes out its performance data into a file like:
+The [main.py](src/performance_tests/main.py) module within the performance_tests folder drives the testing process and generates plots from the collected data, and for each virtualized network, every subscriber in the respective embedded Publish/Subscribe system writes out its performance data into a file like:
 
 **src/performance_tests/data/[centralized,decentralized]/<network name, e.g. "**tree-d3f2-8hosts**" for a tree topology with depth=3, fanout=2>/subscriber-<index, i.e. which subscriber this is for the current system>**
 
-From there, we are able to extract the written data and generate plots to visualize the patterns that exist within it.
+From there, we are able to extract the written data and generate plots to visualize the patterns that exist within it using [matplotlib](https://matplotlib.org/).
+
+For instructions on executing the Performance Tests, see the [Performance Tests README](src/performance_tests/README.md).
 
 ## Sample Testing Results
 
