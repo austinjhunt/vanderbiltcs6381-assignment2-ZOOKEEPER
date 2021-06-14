@@ -1,8 +1,8 @@
 # A Python Framework for Creating Publish/Subscribe Distributed Systems built on top of [ZeroMQ, an asynchronous messaging library](https://zeromq.org/)
 
-This project offers a framework for spinning up a publish/subscribe system either on a single host or on a virtualized network with a tool like [Mininet](http://mininet.org/). It offers two main models of message dissemination, namely: 
+This project offers a framework for spinning up a publish/subscribe system either on a single host or on a virtualized network with a tool like [Mininet](http://mininet.org/). It offers two main models of message dissemination, namely:
 1. centralized dissemination, where a central broker "subscribes" to publishers and forwards published messages appropriately to subscribers whose subscriptions match the published messages. This model offers anonymization (de-coupling) between publishers and subscribers, where each only needs to know about the broker and not about each other. This method also means the broker increasingly becomes a bottleneck as the number of publishers/subscribers grows.
-2. Decentralized dissemination, where a central broker simply registers publishers and subscribers, and notifies subscribers about the IP addresses of the publishers that publish topics they are interested in so the subscribers can connect to those publishers directly. With this model, there is coupling between the publishers and subscribers in that the subscribers have to know the publisher IP addresses and listen to them directly, but there is also no need to funnel all published messages through the broker. 
+2. Decentralized dissemination, where a central broker simply registers publishers and subscribers, and notifies subscribers about the IP addresses of the publishers that publish topics they are interested in so the subscribers can connect to those publishers directly. With this model, there is coupling between the publishers and subscribers in that the subscribers have to know the publisher IP addresses and listen to them directly, but there is also no need to funnel all published messages through the broker.
 
 The project also offers integrated performance / latency analysis by allowing you to configure subscribers to write out latency data (between publishers and subscribers) to a provided filename, which provide insight about how long it takes for messages with specific topics from specific publishers to reach the subscriber (this is done by including the publish time in the message that gets sent).
 
@@ -263,17 +263,17 @@ The Broker class holds a number of responsibilities, which vary depending on the
   * Forwarding those received events to subscribers who are registered as interested in the event topics, if any. If none, then drop events.
   * Upon publisher registration (with new topics being published), setting up a local (on the Broker) publishing/forwarding mechanism for each of that publisher's topics and subsequently notifying that topic's subscribers (if any) about it so they can listen to the Broker for forwarded messages with that topic
 
-To align with these responsibilities, the Broker class is also configurable along a couple of key variables: 
+To align with these responsibilities, the Broker class is also configurable along a couple of key variables:
 
 #### Centralized or Not
 First and foremost, the broker must know whether the Pub/Sub system uses a centralized (centralized=True) or decentralized (centralized=False) dissemination model. This argument significantly governs the path of internal logic when processing received messages from the publisher(s), as can be seen in the above outline.
 
 #### How Long to Listen/Send
-The Broker, similar to the Subscriber and Publisher, can be configured to process events (where "process" could mean different things depending on the dissemination model) either indefinitely or, if not indefinitely, until a specific event count is reached. Note that with the centralized dissemination model, if the Broker is configured to process N events, then any registered Subscriber will receive at most N events even if configured to listen indefinitely. 
+The Broker, similar to the Subscriber and Publisher, can be configured to process events (where "process" could mean different things depending on the dissemination model) either indefinitely or, if not indefinitely, until a specific event count is reached. Note that with the centralized dissemination model, if the Broker is configured to process N events, then any registered Subscriber will receive at most N events even if configured to listen indefinitely.
 
 ### The Driver [(src/driver.py)](src/driver.py)
-The driver script was created to facilitate a modular implementation of performance testing by "driving" the creation, configuration, connection, execution, and disconnection of the different pub/sub entities based on arguments passed into it. Rather than creating one single script to perform a complete test, the reusable driver script allows you to spin up (and down) and configure Pub/Sub entities on a host (or different hosts) by simply passing some key arguments to the driver. Below is an outline of the arguments accepted by the driver. 
-* `-v | --verbose` : verbose logging; pass this to enable debugging 
+The driver script was created to facilitate a modular implementation of performance testing by "driving" the creation, configuration, connection, execution, and disconnection of the different pub/sub entities based on arguments passed into it. Rather than creating one single script to perform a complete test, the reusable driver script allows you to spin up (and down) and configure Pub/Sub entities on a host (or different hosts) by simply passing some key arguments to the driver. Below is an outline of the arguments accepted by the driver.
+* `-v | --verbose` : verbose logging; pass this to enable debugging
 * `-pub | --publisher [COUNT]` : create COUNT publishers on this host (NOTE: current limit on COUNT is 1 as we have not implemented multiprocessing on the driver)
 * `-sub | --subscriber [COUNT]` : create COUNT subscribers on this host (NOTE: current limit on COUNT is 1 as we have not implemented multiprocessing on the driver)
 * `--broker [COUNT]` : create COUNT brokers on this host; NOTE: limit is 1, as the architecture does not support a multi-broker Pub/Sub system
@@ -282,13 +282,13 @@ The driver script was created to facilitate a modular implementation of performa
 * Required with `--publisher` and `--subscriber`
     * `-t | --topic <TOPIC>` : if creating a publisher or subscriber, provide a topic to either publish or subscribe to. If you want multiple for either, use `-t T1 -t T2 [-t T3...]`
     * `-b | --broker_address` : must provide the IP address of the broker (regardless of dissemination method)
-* `-i | --indefinite` : If passed with `--publisher`, publish events indefinitely; If passed with `--subscriber`, listen for published events indefinitely; If passed with `--broker`, process events indefinitely 
+* `-i | --indefinite` : If passed with `--publisher`, publish events indefinitely; If passed with `--subscriber`, listen for published events indefinitely; If passed with `--broker`, process events indefinitely
 * `-m | --max_event_count` : Only applies if `--indefinite` **NOT** passed; maximum number of events to process (publish/listen for/forward).
 * Required with `--publisher`:
-    * `-bp | --bind_port` : port from which to publish events. When passing around the publisher address in messages for identifying publishers, the bind port is included in the address (IP:bind_port) in case multiple publishers are running on the same host. 
-    * `-s | --sleep` : Number of seconds to sleep between publish events 
+    * `-bp | --bind_port` : port from which to publish events. When passing around the publisher address in messages for identifying publishers, the bind port is included in the address (IP:bind_port) in case multiple publishers are running on the same host.
+    * `-s | --sleep` : Number of seconds to sleep between publish events
 
-A couple of key things to note with the driver: 
+A couple of key things to note with the driver:
 * You cannot pass a mix of `--subscriber`, `--publisher`, and `--broker`; you can only create one type of entity per driver.py call
 * You cannot currently pass a COUNT greater than 1 to `--subscriber COUNT`, `--publisher COUNT`, or `--broker COUNT` because multiprocessing on the driver side has not been implemented. With the current structure of the driver, for example, if you want to create 3 Subscribers (`--subscriber 3`) with one call, the driver would enter a 3-iteration loop, where each iteration 1) creates a subscriber, 2) configures the subscriber, and 3) starts the either *indefinite* or *N max events* `notify()` loop for the subscriber. This `notify()` method of the subscriber is blocking, which prevents the 2nd and 3rd subscribers from being created until the first disconnects. Multiprocessing would allow the notify() call to be non-blocking and thus would allow the creation/execution of multiple subscribers per driver.py call. This same problem exists with the Publisher's `publish()` method. For the Broker, the limit is 1 because the general project architecture does not currently support a multiple-broker Publish/Subscribe system.
         * HOWEVER, you can still create multiple Publishers (or multiple Subscribers) per host, just using separated driver calls with `--publisher 1` or `--subscriber 1`
@@ -299,41 +299,42 @@ The Unit Testing module (which uses [unittest](https://docs.python.org/3/library
 
 ## Performance Testing
 
-The Performance Testing module uses [The Python API for Mininet](https://github.com/mininet/mininet/wiki/Introduction-to-Mininet) in combination with [The Driver](src/driver.py) to automatically spin up a series of different virtualized network topologies through Mininet (all with Python) and embed a unique Publish/Subscribe system into each of those topologies for the purpose of collecting file-written performance data (via the `--filename` argument to the Subscriber) to understand how Publish/Subscribe latency is impacted by things like: 
+The Performance Testing module uses [The Python API for Mininet](https://github.com/mininet/mininet/wiki/Introduction-to-Mininet) in combination with [The Driver](src/driver.py) to automatically spin up a series of different virtualized network topologies through Mininet (all with Python) and embed a unique Publish/Subscribe system into each of those topologies for the purpose of collecting file-written performance data (via the `--filename` argument to the Subscriber) to understand how Publish/Subscribe latency is impacted by things like:
 * Number of hosts (# pubs, # subs) in the system
 * Dissemination model (centralized vs decentralized)
 * Topology type (e.g. single switch vs. tree topology)
-as well as how the above variables relate in regard to latency. 
+as well as how the above variables relate in regard to latency.
 
-The Performance Testing module is split into two main classes: 
+The Performance Testing module is split into two main classes:
 * [(CentralizedPerformanceTest)](src/performance_tests/centralized.py) - for testing performance of centralized dissemination pub/sub systems along various network topologies and various counts of publishers and subcribers
 * [(DecentralizedPerformanceTest)](src/performance_tests/decentralized.py) - for testing performance of decentralized dissemination pub/sub systems along various network topologies and various counts of publishers and subcribers
 
-Both of the above classes can be configured along: 
+Both of the above classes can be configured along:
 * The number of events to collect data for (sample size) within a given pub sub system
 * The event interval (the argument to `--sleep` when creating a publisher indicating the number of seconds to sleep between publish events)
-* The **wait factor**. When the virtualized network is spun up and the Pub/Sub system begins executing in the background, we need to wait some amount of time for that Pub/Sub system to generate and write the data we are interested in. Specifically, the subscriber is responsible for writing the performance data to a file, and it only writes this data once the event count (item 1 in this list) is reached. This wait time for a given test is calculated as: 
+* The **wait factor**. When the virtualized network is spun up and the Pub/Sub system begins executing in the background, we need to wait some amount of time for that Pub/Sub system to generate and write the data we are interested in. Specifically, the subscriber is responsible for writing the performance data to a file, and it only writes this data once the event count (item 1 in this list) is reached. This wait time for a given test is calculated as:
+##### wait factor calculation
 `wait_time = self.wait_factor * (self.num_events * self.event_interval)`
-where `self` refers to an instance of one of the above Classes. 
-    * Since the amount of time we need to wait for each subscriber in the system to receive and write all of their expected events certainly needs to scale with the number of hosts in the system, we added a **setWaitFactor(factor)** method to the testing classes allowing for the wait factor to be updated with respect to a changing number of hosts. For example: 
+where `self` refers to an instance of one of the above Classes.
+    * Since the amount of time we need to wait for each subscriber in the system to receive and write all of their expected events certainly needs to scale with the number of hosts in the system, we added a **setWaitFactor(factor)** method to the testing classes allowing for the wait factor to be updated with respect to a changing number of hosts. For example:
     ```
     # Min = 4 hosts, Max = 256 hosts
     for depth in range(2,5):
         for fanout in range(2,5):
             # Adjust the wait factor as number of hosts grows.
             centralized_perf_test.setWaitFactor(factor=depth*fanout)
-            
+
             # Test centralized pub sub with this tree topology
             centralized_perf_test.test_tree_topology(depth=depth, fanout=fanout)
     ```
 
-For each virtualized network, every subscriber in the respective embedded Publish/Subscribe system writes out its performance data into a file like: 
+For each virtualized network, every subscriber in the respective embedded Publish/Subscribe system writes out its performance data into a file like:
 
 **src/performance_tests/data/[centralized,decentralized]/<network name, e.g. "**tree-d3f2-8hosts**" for a tree topology with depth=3, fanout=2>/subscriber-<index, i.e. which subscriber this is for the current system>**
 
-From there, we are able to extract the written data and generate plots to visualize the patterns that exist within it. 
+From there, we are able to extract the written data and generate plots to visualize the patterns that exist within it.
 
-## Patterns Found 
+## Patterns Found
 There are several interesting observations can be made from the tests that have been run within the Performance Testing Framework:
 1. The latency with direct dissemination is in general smaller than that with centralized dissemination.
 2. The distribution of latency for direct dissemination is more uniformly distributed without outliers, while there are extra large latencies with centralized dissemination
