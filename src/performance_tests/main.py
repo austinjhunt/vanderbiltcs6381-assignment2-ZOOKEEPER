@@ -38,6 +38,6 @@ def run_decentralized_tests():
 if __name__ == "__main__":
 
     # Run centralized dissemination tests
-    # run_centralized_tests()
+    run_centralized_tests()
     # Run decentralized dissemination tests
     run_decentralized_tests()

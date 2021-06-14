@@ -56,7 +56,9 @@ The biggest differences between the two subclasses are:
 3. The Centralized subclass writes **logs** to logs/centralized/* and the Decentralized subclass writes data to logs/decentralized/*
 
 The [main](main.py) module runs both centralized and decentralized performance tests using those subclasses. To run the main performance tests module:
-1. `cd` into the `src` directory
-2. Run the following command:
-   i. `python3 -m performance_tests.main`
-   ii. Wait for a while for the tests to run and write their data to their respective folders.
+1. Make sure you've installed the requirements for the project. We recommend using a virtual environment with Python 3.8.
+2. `cd` into the `src` directory
+3. Run the following command:
+   1. `python3 -m performance_tests.main`
+   2. Wait for a while for the tests to run and write their data to their respective folders.
+
