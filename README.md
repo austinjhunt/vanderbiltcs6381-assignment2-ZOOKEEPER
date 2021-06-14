@@ -35,7 +35,7 @@ git clone git://github.com/mininet/mininet
 cd mininet
 git checkout -b mininet-2.3.0 2.3.0
 cd ..
-PYTHON=python3 mininet/util/install.sh -n
+PYTHON=python3 mininet/util/install.sh -a
 ```
 14. Navigate to the mounted directory: `/mnt/dev/vanderbiltcs6381-assignment1-ZMQPUBSUB`
 15. Now install the Python requirements in the VM, this time not using a virtual environment as it complicates things with Mininet.
