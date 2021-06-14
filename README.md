@@ -6,7 +6,43 @@ This project offers a framework for spinning up a publish/subscribe system eithe
 
 The project also offers integrated performance / latency analysis by allowing you to configure subscribers to write out latency data (between publishers and subscribers) to a provided filename, which provide insight about how long it takes for messages with specific topics from specific publishers to reach the subscriber (this is done by including the publish time in the message that gets sent).
 
+## Development Environment
+To work with this system, you should do the following:
+1. Install [VirtualBox](https://www.virtualbox.org/)
+2. Set up an Ubuntu Server (or Desktop) 20.04 virtual machine within VirtualBox. You can download the Ubuntu .iso file [here](https://ubuntu.com/download/server). You can follow [these instructions](https://www.youtube.com/watch?v=x5MhydijWmc) to set up your Ubuntu VM.
+3. Pausing on the VM for now, clone this repository to a directory of your choice on your computer.
+``` git clone https://github.com/austinjhunt/vanderbiltcs6381-assignment1-ZMQPUBSUB.git ```
+4. Navigate inside the project folder: `cd vanderbiltcs6381-assignment1-ZMQPUBSUB`
+5. Create a Python3.8 virtual environment to isolate the Python dependencies for this project. ` python3.8 -m venv venv `
+6. Activate the virtual environment: `source venv/bin/activate`
+7. Install the Python requirements from the requirements.txt file. `pip install -r requirements.txt`
+8. Now, back to the VM. Once you have created your VM and it's listed in VirtualBox, click on it, then click the Settings option, then go to **Shared Folders** and click the little folder with the '+' button on the right to add a new shared folder. For folder name, use `vanderbiltcs6381-assignment1-ZMQPUBSUB`. For folder path, choose the project folder you just cloned. Leave Read-Only unchecked. Check Auto-Mount. Check Make Permanent. For mount point, use: `/mnt/dev/vanderbiltcs6381-assignment1-ZMQPUBSUB`. This will mount the project from your computer into the Virtual Machine at that location (with the same root folder name).
+9. Start the VM.
+10. Once it is started, open a Terminal Window. Become root with: `sudo -i` and enter your sudo password.
+11. Navigate to the mounted directory.
+12. Run the following commands to install Python3.8 and pip pon your VM.
+```
+apt update
+apt install software-properties-common
+add-apt-repository ppa:deadsnakes/ppa
+apt install python3.8
+apt install python3-pip
+```
+13. Install Mininet using [Option 2: Native Installation from Source](http://mininet.org/download/) on the Mininet homepage, with the Python3 note at the bottom of the page.
+```
+cd /opt/
+git clone git://github.com/mininet/mininet
+cd mininet
+git checkout -b mininet-2.3.0 2.3.0
+cd ..
+PYTHON=python3 mininet/util/install.sh -n
+```
+14. Now install the Python requirements in the VM, this time not using a virtual environment as it complicates things with Mininet.
+```
+pip install -r requirements.txt
+```
 
+You now have a VM mounted to the project folder with the necessary dependencies installed to run the framework and associated tests.
 ## Architecture
 
 The following sections provide an overview of the basic architecture of this project, outlining the core entities that interact to form a fully-functional Publish-Subscribe distributed system with optional broker-based anonyomization between publishers and subscribers.
