@@ -162,18 +162,19 @@ if __name__ == "__main__":
 
     test_driver = TestDriver()
     # Run centralized dissemination tests
-    # centralized_results = test_driver.run_centralized_tests()
+    centralized_results = test_driver.run_centralized_tests()
     # Run decentralized dissemination tests
     decentralized_results = test_driver.run_decentralized_tests()
 
     # Generate global plots for both centralized and decentralized
-    # test_driver.generate_plots(model="global")
+    test_driver.generate_plots(model="global")
 
     # Generate specific centralized/decentralized plots per subscriber
-    # test_driver.generate_plots(model="centralized")
+    test_driver.debug("Generating plots...")
+    test_driver.generate_plots(model="centralized")
     test_driver.generate_plots(model="decentralized")
 
-    # test_driver.debug("Checking centralized results...")
-    # test_driver.check_success_rate(centralized_results)
+    test_driver.debug("Checking centralized results...")
+    test_driver.check_success_rate(centralized_results)
     test_driver.debug("Checking decentralized results...")
     test_driver.check_success_rate(decentralized_results)
