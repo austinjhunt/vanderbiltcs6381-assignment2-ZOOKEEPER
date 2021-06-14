@@ -230,6 +230,7 @@ class Broker:
                 # and subscribers steal poll pipeline events from each other.
                 notify_port = self.get_clear_port()
                 msg = {'register_sub': {'notify_port': notify_port}}
+                self.sub_reg_socket.send_string(json.dumps(msg))
                 ## Notify new subscriber about all publishers of topic
                 ## so they can listen directly
                 # Set up a new notify socket on a clear port for this subscriber
@@ -239,7 +240,7 @@ class Broker:
                 self.used_ports.append(notify_port)
                 self.notify_sub_sockets[sub_id].bind(f"tcp://*:{notify_port}")
                 self.notify_subscribers(topics=topics, sub_id=sub_id)
-                self.sub_reg_socket.send_string(json.dumps(msg))
+
             else:
                 ## Make sure there is a socket for each new topic.
                 self.update_send_socket()
@@ -297,6 +298,7 @@ class Broker:
                 )
             message = json.dumps(message)
             # Send to notify socket for new subscriber address
+            logging.debug(f"Senging message to subscriber: {message}", extra=self.prefix)
             self.notify_sub_sockets[sub_id].send_string(message)
             # As client, have to send a request then wait for a response
             # self.notify_sub_socket.send_string(message)
@@ -362,7 +364,7 @@ class Broker:
             response = {'error': f'registration failed due to exception: {e}'}
         logging.debug(f"Sending response: {response}", extra=self.prefix)
         self.pub_reg_socket.send_string(json.dumps(response))
-        # logging.debug("Publisher Registration Succeeded", extra=self.prefix)
+        logging.debug("Publisher Registration Succeeded", extra=self.prefix)
 
     def get_host_address(self):
         """ Method to return IP address of current host.
