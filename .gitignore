@@ -3,5 +3,4 @@ venv
 .vscode
 .env
 __pycache__
-data
 logs

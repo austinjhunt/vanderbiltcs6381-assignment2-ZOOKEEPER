@@ -1,8 +1,5 @@
+from .ptest import PerformanceTest
 import time
-from mininet.net import Mininet
-from mininet.topolib import TreeTopo
-from mininet.node import Controller
-from topologies.single_switch_topology import SingleSwitchTopo
 import os
 import logging
 import sys
@@ -12,42 +9,17 @@ logging.basicConfig(
     format='%(prefix)s - %(message)s')
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-class CentralizedPerformanceTest:
-
-    def __init__(self, num_events=50, event_interval=0.3, wait_factor=10):
-        self.num_events = num_events
-        self.event_interval = event_interval
-        # Sleep self.wait_factor times longer than num events * event interval
-        # to allow the network to initialize and all events to run.
-        # Files not written by subscriber until it reaches num_events.
-        self.wait_factor = wait_factor
-        self.prefix = {'prefix': ''}
-
-    def cleanup(self):
-        os.system("mn -c")
-
-    def debug(self, msg):
-        logging.debug(msg, extra=self.prefix)
-
-    def setWaitFactor(self, factor):
-        """ Method to update the wait factor (to wait <factor> times as long
-        as num events * event interval for pub sub to generate data """
-        self.wait_factor = factor
-
-    def create_network(self, topo=None):
-        """ Handle pre-cleanup if necessary """
-        network = None
-        if topo:
-            try:
-                network = Mininet(topo=topo)
-            except Exception as e:
-                os.system('mn -c')
-                network = Mininet(topo=topo)
-        return network
-
+class CentralizedPerformanceTest(PerformanceTest):
 
     def run_network(self, network=None, num_hosts=None, network_name=""):
-        self.prefix['prefix'] = f'NET-{network_name}-TEST - '
+        """ Interface method from PerformanceTest superclass; implementation for
+        centralized performance testing of pub/sub system in provided network
+        args:
+        network (Mininet object) - network to start and create hosts on
+        num_hosts (int) - number of hosts in network
+        network_name - alias of network, used to create folders for data/logs
+        """
+        self.prefix['prefix'] = f'CENTRAL-NET-{network_name}-TEST - '
 
         if network and num_hosts:
             # For subs, write data files into a folder within this folder
@@ -80,7 +52,7 @@ class CentralizedPerformanceTest:
 
             # Set up broker on first host (h1)
             broker_command = (
-                f'python3 ../driver.py '
+                f'python3 driver.py '
                 '--broker 1 --verbose '
                 f'--indefinite ' # max event count only matters for subscribers who write files at end.
                 f'--centralized ' # CENTRALIZED TESTING
@@ -98,10 +70,9 @@ class CentralizedPerformanceTest:
                 network.hosts[i] for i in range(num_subscribers + 1, num_hosts)
             ]
             self.debug(f"Starting {num_subscribers} subscribers...")
-
             for index,host in enumerate(subscribers):
                 host.cmd(
-                    'python3 ../driver.py '
+                    'python3 driver.py '
                     '--subscriber 1 '
                     '--topics A --topics B --topics C '
                     f'--max_event_count {self.num_events} '
@@ -115,13 +86,12 @@ class CentralizedPerformanceTest:
             self.debug(f"Creating {num_publishers} publishers...")
             for index,host in enumerate(publishers):
                 host.cmd(
-                    f'python3 ../driver.py '
+                    f'python3 driver.py '
                     '--publisher 1 '
                     f'--sleep {self.event_interval} '
                     f'--indefinite ' # max event count only matters for subscribers who write files at end.
                     '--topics A --topics B --topics C '
                     f'--broker_address {broker_ip} '
-                    '--centralized ' # CENTRALIZED TESTING
                     f'--verbose  &> {log_folder}/pub-{index}.log &'
                     )
             self.debug("Publishers created!")
@@ -146,45 +116,3 @@ class CentralizedPerformanceTest:
         else:
             logging.error("Need to pass network and num_hosts to initialize_network()")
 
-    def test_tree_topology(self, depth=2, fanout=2):
-        """ Create and test Pub/Sub on a Tree topology with fanout^depth hosts,
-        with one broker and an equal number of subscribers and publishers """
-        tree = TreeTopo(depth=depth, fanout=fanout)
-        network = self.create_network(topo=tree)
-        self.run_network(
-            network=network,
-            network_name=f"tree-d{depth}f{fanout}-{fanout**depth}hosts",
-            num_hosts=fanout ** depth
-        )
-        self.cleanup()
-
-    def test_single_switch_topology(self, num_hosts=3):
-        """ Create and test Pub/Sub on a Single Switch Topology mininet network
-        with a variable number of subscribers and publishers """
-        if num_hosts < 3:
-            # Raise exception. You need at least one broker, one subscriber and one publisher.
-            raise Exception("Topology must include at least 3 hosts")
-        topo = SingleSwitchTopo(n=num_hosts)
-        network = self.create_network(topo=topo)
-        self.run_network(
-            network=network,
-            num_hosts=num_hosts,
-            network_name=f"singleswitch-{num_hosts}-hosts"
-        )
-        self.cleanup()
-
-
-if __name__ == "__main__":
-
-    centralized_perf_test = CentralizedPerformanceTest(
-        num_events=100,
-        event_interval=0.1,
-        wait_factor=5
-    )
-
-    # Min = 4 hosts, Max = 256 hosts
-    for depth in range(2,5):
-        for fanout in range(2,5):
-            # Adjust the wait factor as number of hosts grows. fanout * 3 = (6->12)
-            centralized_perf_test.setWaitFactor(factor=depth*fanout)
-            centralized_perf_test.test_tree_topology(depth=depth, fanout=fanout)
