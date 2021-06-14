@@ -64,7 +64,6 @@ class TestDriver:
             event_interval=0.1,
             wait_factor=5
         )
-
         # Min = 4 hosts, Max = 256 hosts
         results = []
         for depth in range(2,5):
@@ -73,7 +72,8 @@ class TestDriver:
                 centralized_perf_test.setWaitFactor(factor=depth*fanout)
                 result = centralized_perf_test.test_tree_topology(depth=depth, fanout=fanout)
                 results.append(result)
-        self.check_success_rate(results)
+        return results
+
 
     def run_decentralized_tests(self):
         """ Run decentralized dissemination model performance tests in various network topologies """
@@ -87,11 +87,13 @@ class TestDriver:
         results = []
         for depth in range(2,5):
             for fanout in range(2,5):
-                # Adjust the wait factor as number of hosts grows. fanout * 3 = (6->12)
-                decentralized_perf_test.setWaitFactor(factor=depth*fanout)
-                result = decentralized_perf_test.test_tree_topology(depth=depth, fanout=fanout)
-                results.append(result)
-        self.check_success_rate(results)
+                # Can't do 81 and 256 hosts. Too many for virtualbox to run.
+                if fanout ** depth < 81:
+                    # Adjust the wait factor as number of hosts grows. fanout * 3 = (6->12)
+                    decentralized_perf_test.setWaitFactor(factor=depth*fanout)
+                    result = decentralized_perf_test.test_tree_topology(depth=depth, fanout=fanout)
+                    results.append(result)
+        return results
 
 
     def generate_plots(self, model="centralized"):
@@ -128,7 +130,6 @@ class TestDriver:
                 except FileExistsError:
                     pass
                 for file in os.listdir(f'{data_parent_folder}/{dir}'):
-                    print(file)
                     # Get the data for this specific pub/sub system from the
                     # received messages file written by the subscriber
                     data = pd.read_csv(f'{data_parent_folder}/{dir}/{file}')
@@ -161,13 +162,18 @@ if __name__ == "__main__":
 
     test_driver = TestDriver()
     # Run centralized dissemination tests
-    test_driver.run_centralized_tests()
+    # centralized_results = test_driver.run_centralized_tests()
     # Run decentralized dissemination tests
-    test_driver.run_decentralized_tests()
+    decentralized_results = test_driver.run_decentralized_tests()
 
     # Generate global plots for both centralized and decentralized
-    test_driver.generate_plots(model="global")
+    # test_driver.generate_plots(model="global")
 
     # Generate specific centralized/decentralized plots per subscriber
-    test_driver.generate_plots(model="centralized")
+    # test_driver.generate_plots(model="centralized")
     test_driver.generate_plots(model="decentralized")
+
+    # test_driver.debug("Checking centralized results...")
+    # test_driver.check_success_rate(centralized_results)
+    test_driver.debug("Checking decentralized results...")
+    test_driver.check_success_rate(decentralized_results)

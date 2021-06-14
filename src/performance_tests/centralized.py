@@ -14,7 +14,7 @@ class CentralizedPerformanceTest(PerformanceTest):
     def set_logger(self):
         self.logger = logging.getLogger(__name__)
         handler = logging.StreamHandler()
-        handler.setLevel(logging.INFO)
+        handler.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(prefix)s - %(message)s')
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
