@@ -3,7 +3,7 @@ execute and can be tested independently of the publish/subscribe network """
 import unittest
 import time
 import pickle
-from . import *
+from src.unit_tests import *
 from src.lib.publisher import Publisher
 
 class TestPublisher(unittest.TestCase):

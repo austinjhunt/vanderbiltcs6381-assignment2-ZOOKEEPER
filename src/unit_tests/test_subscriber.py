@@ -1,9 +1,8 @@
 """ Module to perform unit tests against Subscriber class for methods that
 execute and can be tested independently of the publish/subscribe network """
 import unittest
-import time
 import os
-from . import *
+from src.unit_tests import *
 from src.lib.subscriber import Subscriber
 
 class TestSubscriber(unittest.TestCase):
